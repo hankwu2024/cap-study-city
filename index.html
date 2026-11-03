@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>會考學習城</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- 城內地圖 -->
+  <canvas id="world-canvas"></canvas>
+
+  <!-- 上方資訊列 -->
+  <header id="hud" class="hidden">
+    <div class="hud-left">
+      <span class="hud-chip name" id="hud-name"></span>
+      <span class="hud-chip days">⏳ 會考倒數 <b id="hud-days">0</b> 天</span>
+      <span class="hud-chip gold">🎫 出城令 <b id="hud-tickets">0</b></span>
+      <span class="hud-chip">❌ 待練錯題 <b id="hud-wrongs">0</b></span>
+    </div>
+    <div class="hud-right">
+      <button id="btn-travel" title="快速前往">📍 快速前往</button>
+      <button id="btn-overview" title="各科總覽">📊 總覽</button>
+      <button id="btn-zoom-out" title="縮小">－</button>
+      <button id="btn-zoom-in" title="放大">＋</button>
+      <button id="btn-settings" title="設定">⚙️</button>
+    </div>
+  </header>
+  <div id="help" class="hidden">WASD／方向鍵移動　·　點地板自動走過去　·　靠近發光物件按 E 或直接點它　·　滾輪縮放</div>
+
+  <!-- 視窗 -->
+  <div id="modal" class="modal hidden">
+    <div class="modal-box">
+      <header><h2 class="modal-title"></h2><button class="modal-x" aria-label="關閉">✕</button></header>
+      <div class="modal-body"></div>
+    </div>
+  </div>
+  <div id="lightbox" class="hidden"><img alt="照片"></div>
+
+  <!-- 開場 -->
+  <div id="onboard" class="hidden"></div>
+
+  <!-- 城外遊戲 -->
+  <div id="game" class="hidden">
+    <canvas id="game-canvas"></canvas>
+    <div id="touch-ui" class="hidden">
+      <div id="stick-zone"><div id="stick-base"><div id="stick-knob"></div></div></div>
+      <div id="touch-btns">
+        <button id="tb-fire">攻擊</button>
+        <button id="tb-skill">技能</button>
+        <button id="tb-swap">換槍</button>
+        <button id="tb-use">撿取</button>
+      </div>
+      <button id="tb-pause">⏸</button>
+    </div>
+    <div id="game-overlay" class="hidden"></div>
+  </div>
+
+  <div id="toasts"></div>
+
+  <script src="js/data.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/logic.js"></script>
+  <script src="js/sprites.js"></script>
+  <script src="js/world.js"></script>
+  <script src="js/panels.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
