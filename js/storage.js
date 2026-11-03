@@ -24,6 +24,8 @@ const Store = {
     try {
       const raw = localStorage.getItem(STORE_KEY);
       this.state = Object.assign(this.defaults(), raw ? JSON.parse(raw) : {});
+      const pf = this.state.profile;
+      if (pf && !CHAR[pf.char]) { pf.char = CHAR_MIGRATE[pf.char] || CHARACTERS[0].id; this.save(); }
     } catch (e) {
       console.error(e);
       this.state = this.defaults();

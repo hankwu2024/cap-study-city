@@ -96,37 +96,6 @@ const SUBJECTS = [
 
 const SUBJ = Object.fromEntries(SUBJECTS.map(s => [s.id, s]));
 
-const CHARACTERS = [
-  {
-    id: 'lingxiao', name: '凌霄', title: '星際劍客', tag: '科幻 × 武俠',
-    desc: '從星際門派下山的劍客，一把光刃斬斷所有難題。',
-    hair: '#2b2d42', skin: '#f5c6a0', body: '#e8f1ff', trim: '#3ad1ff', legs: '#2b2d42', acc: 'band',
-    hp: 6, shield: 4, energy: 160, weapons: ['blade', 'pistol'],
-    skill: { name: '流光劍舞', desc: '向前突進並斬擊路徑上的敵人，突進時無敵', cd: 5 },
-  },
-  {
-    id: 'xingyu', name: '星語', title: '符文魔導師', tag: '魔法',
-    desc: '能讀懂星星符文的魔導師，知識就是她的魔力。',
-    hair: '#f4e9ff', skin: '#f7d2b5', body: '#7b3fb0', trim: '#ffd166', legs: '#3b1d5a', acc: 'hat',
-    hp: 4, shield: 5, energy: 240, weapons: ['staff', 'pistol'],
-    skill: { name: '星隕', desc: '召喚流星砸向附近的敵人，範圍傷害', cd: 8 },
-  },
-  {
-    id: 'tieyu', name: '鐵羽', title: '機甲遊俠', tag: '科幻',
-    desc: '穿著自製機甲的少年工程師，最愛拆解公式。',
-    hair: '#5a3b1f', skin: '#eab48f', body: '#4a5263', trim: '#ff8c1a', legs: '#2f3542', acc: 'visor',
-    hp: 5, shield: 6, energy: 180, weapons: ['smg', 'pistol'],
-    skill: { name: '浮游砲台', desc: '放置一座自動射擊的砲台，持續 8 秒', cd: 12 },
-  },
-  {
-    id: 'xiaoju', name: '小橘', title: '便當勇者', tag: '日常',
-    desc: '普通的國中生，但她的便當有神奇的元氣。',
-    hair: '#ff9f43', skin: '#f9d3b4', body: '#ffffff', trim: '#2e86de', legs: '#2e86de', acc: 'ribbon',
-    hp: 7, shield: 3, energy: 160, weapons: ['spoon', 'pistol'],
-    skill: { name: '元氣便當', desc: '回復 2 點生命、護盾全滿，並加速 4 秒', cd: 15 },
-  },
-];
-const CHAR = Object.fromEntries(CHARACTERS.map(c => [c.id, c]));
 
 const TICKET_NAME = '出城令';
 const EXAM_URL = 'https://cap.rcpet.edu.tw/examination.html';

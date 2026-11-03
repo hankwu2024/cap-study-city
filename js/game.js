@@ -100,6 +100,7 @@ const Game = (() => {
   function enterStage() {
     const isBoss = stage % 5 === 0, isTreasure = stage % 5 === 3;
     map = genMap(isBoss);
+    decorate();
     enemies = []; bullets = []; pickups = []; parts = []; texts = []; turrets = []; meteors = [];
     portal = null; chest = null;
     player.x = map.w * TS / 2; player.y = (map.h - 3) * TS;
@@ -213,9 +214,9 @@ const Game = (() => {
     const ch = player.ch;
     player.skillCd = ch.skill.cd;
     addText(player.x, player.y - 28, ch.skill.name + '！', '#7efff5');
-    if (ch.id === 'lingxiao') {
+    if (ch.skill.type === 'dash') {
       player.dash = 0.22; player.dashDir = player.aim; player.inv = Math.max(player.inv, 0.35); player.dashHit = new Set();
-    } else if (ch.id === 'xingyu') {
+    } else if (ch.skill.type === 'meteor') {
       const targets = enemies.filter(e => e.spawnT <= 0).sort((a, b) => dist(a, player) - dist(b, player)).slice(0, 6);
       for (let i = 0; i < 6; i++) {
         const tg = targets[i % Math.max(1, targets.length)];
@@ -223,7 +224,7 @@ const Game = (() => {
         const y = tg ? tg.y + (Math.random() - 0.5) * 10 : player.y + Math.sin(i) * 50;
         meteors.push({ x, y, t: 0.5 + i * 0.12, r: 26, dmg: 7 });
       }
-    } else if (ch.id === 'tieyu') {
+    } else if (ch.skill.type === 'turret') {
       turrets.push({ x: player.x, y: player.y - 2, life: 8, cd: 0 });
     } else {
       player.hp = Math.min(player.maxHp, player.hp + 2); player.shield = player.maxShield; player.speedUp = 4;
@@ -528,6 +529,113 @@ const Game = (() => {
     c.restore();
   }
 
+  // ---------- 場景美術 ----------
+  const hsh = (x, y, k = 0) => ((x * 73856093) ^ (y * 19349663) ^ (k * 83492791)) >>> 0;
+  let darkCv = null;
+
+  function decorate() {
+    const th = Math.floor((stage - 1) / 5) % 3, tm = theme();
+    const lay = document.createElement('canvas');
+    lay.width = map.w * TS; lay.height = map.h * TS;
+    const g = lay.getContext('2d');
+    map.deco = []; map.torches = []; map.glows = [];
+    const at = (x, y) => (x < 0 || y < 0 || x >= map.w || y >= map.h) ? 1 : map.tiles[y * map.w + x];
+    const cx = map.w / 2, cy = map.h / 2;
+    for (let y = 0; y < map.h; y++) for (let x = 0; x < map.w; x++) {
+      const v = map.tiles[y * map.w + x], px = x * TS, py = y * TS, h = hsh(x, y, stage);
+      if (v === 1) {
+        const below = at(x, y + 1) !== 1;
+        R(g, px, py, TS, TS, tm.wall);
+        R(g, px, py, TS, 1, tm.face);
+        if (hsh(x, y) % 3 === 0) R(g, px + 3, py + 5, 8, 1, '#00000030');
+        if (below) {
+          R(g, px, py + 4, TS, 12, tm.face);
+          for (let k = 0; k < 3; k++) { R(g, px, py + 4 + k * 4 + 3, TS, 1, '#00000030'); R(g, px + ((k + x) % 2) * 8 + 2, py + 4 + k * 4, 1, 3, '#00000030'); }
+          R(g, px, py + 4, TS, 1, '#ffffff30'); R(g, px, py + 14, TS, 2, '#00000050');
+          if (x % 5 === 2 && y === 0) map.torches.push({ x: px + 8, y: py + 8 });
+        }
+        if (at(x - 1, y) !== 1) R(g, px, py, 1, TS, '#ffffff22');
+        if (at(x + 1, y) !== 1) R(g, px + 15, py, 1, TS, '#00000040');
+        continue;
+      }
+      if (th === 0) {
+        R(g, px, py, TS, TS, [tm.a, tm.b, '#709553'][h % 3]);
+        for (let k = 0; k < 4; k++) R(g, px + ((h >>> (k * 3)) % 16), py + ((h >>> (k * 3 + 1)) % 16), 1, 1, k % 2 ? '#5a7a3f' : '#86ab66');
+        if (h % 6 === 0) { const tx = px + (h % 11) + 2, ty = py + ((h >>> 4) % 9) + 4; R(g, tx, ty, 1, 3, '#9cc47a'); R(g, tx + 2, ty + 1, 1, 2, '#9cc47a'); }
+        if (h % 31 === 0) { R(g, px + 6, py + 6, 2, 2, '#ffe066'); R(g, px + 9, py + 8, 2, 2, '#ffe066'); }
+      } else if (th === 1) {
+        R(g, px, py, TS, TS, (x + y) % 2 ? tm.a : tm.b);
+        R(g, px, py, TS, 1, '#00000030'); R(g, px, py, 1, TS, '#00000030');
+        if (h % 5 === 0) { R(g, px + 3, py + 4, 5, 1, '#3d1f1a'); R(g, px + 7, py + 5, 1, 4, '#3d1f1a'); R(g, px + 8, py + 8, 4, 1, '#3d1f1a'); }
+        if (h % 13 === 0) { R(g, px + 3, py + 9, 9, 1, '#ff6b35'); R(g, px + 6, py + 7, 1, 3, '#ff9f1a'); map.glows.push({ x: px + 8, y: py + 9, r: 22, col: '255,110,40' }); }
+      } else {
+        R(g, px, py, TS, TS, (x + y) % 2 ? tm.a : tm.b);
+        R(g, px, py, TS, 1, '#ffffff10'); R(g, px, py, 1, TS, '#ffffff10');
+        if (h % 4 === 0) R(g, px + (h % 14) + 1, py + ((h >>> 3) % 14) + 1, 1, 1, '#c9c9ff');
+        if (h % 17 === 0) { g.strokeStyle = '#8f7dff'; g.strokeRect(px + 4.5, py + 4.5, 7, 7); R(g, px + 7, py + 3, 2, 10, '#8f7dff55'); map.glows.push({ x: px + 8, y: py + 8, r: 18, col: '150,120,255' }); }
+      }
+      if (at(x, y - 1) === 1) { R(g, px, py, TS, 4, '#00000040'); R(g, px, py + 4, TS, 2, '#00000020'); }
+      if (at(x - 1, y) === 1) R(g, px, py, 3, TS, '#00000025');
+      if (at(x + 1, y) === 1) R(g, px + 13, py, 3, TS, '#00000020');
+      // 不會擋路的裝飾物
+      if (v === 0 && h % 19 === 3 && (Math.abs(x - cx) > 3 || Math.abs(y - cy) > 3) && y < map.h - 4) {
+        const kind = th === 0 ? ['bamboo', 'mushroom', 'bush'][h % 3] : th === 1 ? ['bones', 'lavaPool', 'skull'][h % 3] : ['crystal', 'orb', 'crystal'][h % 3];
+        map.deco.push({ kind, x: px + 8, y: py + 12, s: h % 100 });
+        if (kind === 'lavaPool') map.glows.push({ x: px + 8, y: py + 10, r: 30, col: '255,90,30' });
+        if (kind === 'crystal' || kind === 'orb') map.glows.push({ x: px + 8, y: py + 6, r: 26, col: kind === 'orb' ? '255,220,120' : '120,200,255' });
+      }
+    }
+    map.layer = lay;
+  }
+
+  function drawDeco() {
+    map.deco.forEach(d => {
+      const x = Math.round(d.x), y = Math.round(d.y);
+      if (d.kind === 'bamboo') { const s = Math.round(Math.sin(t * 1.5 + d.s) * 1); for (const bx of [-4, 0, 3]) { R(c, x + bx + s, y - 26, 2, 26, '#5d9c3a'); for (let k = 0; k < 4; k++) R(c, x + bx + s, y - 24 + k * 6, 2, 1, '#2f5f1c'); } R(c, x - 6 + s, y - 22, 5, 2, '#88c057'); R(c, x + 4 + s, y - 15, 5, 2, '#88c057'); }
+      else if (d.kind === 'mushroom') { R(c, x - 1, y - 5, 2, 5, '#f5e6c8'); R(c, x - 4, y - 8, 8, 3, '#e74c3c'); R(c, x - 2, y - 8, 1, 1, '#fff'); R(c, x + 2, y - 7, 1, 1, '#fff'); }
+      else if (d.kind === 'bush') { R(c, x - 6, y - 7, 12, 7, '#3f7a2c'); R(c, x - 4, y - 9, 8, 3, '#5a9a3f'); R(c, x - 2, y - 5, 2, 2, '#e63946'); }
+      else if (d.kind === 'bones') { R(c, x - 5, y - 3, 10, 2, '#e8e2d0'); R(c, x - 6, y - 4, 2, 4, '#e8e2d0'); R(c, x + 4, y - 4, 2, 4, '#e8e2d0'); }
+      else if (d.kind === 'skull') { R(c, x - 3, y - 7, 6, 5, '#e8e2d0'); R(c, x - 2, y - 5, 1, 2, '#222'); R(c, x + 1, y - 5, 1, 2, '#222'); R(c, x - 2, y - 2, 4, 1, '#cfc7b0'); }
+      else if (d.kind === 'lavaPool') { const g = 0.5 + 0.5 * Math.sin(t * 3 + d.s); c.fillStyle = '#4a1c12'; c.beginPath(); c.ellipse(x, y - 3, 9, 4, 0, 0, 7); c.fill(); c.fillStyle = `rgb(255,${Math.round(100 + g * 80)},30)`; c.beginPath(); c.ellipse(x, y - 3, 7, 3, 0, 0, 7); c.fill(); if (Math.floor(t * 3 + d.s) % 4 === 0) R(c, x - 2, y - 5, 2, 2, '#ffe08a'); }
+      else if (d.kind === 'crystal') { const g = 0.6 + 0.4 * Math.sin(t * 2 + d.s); R(c, x - 2, y - 12, 4, 12, `rgba(120,200,255,${g})`); R(c, x - 6, y - 7, 3, 7, `rgba(160,140,255,${g})`); R(c, x + 3, y - 8, 3, 8, `rgba(160,140,255,${g})`); R(c, x - 1, y - 11, 1, 6, '#ffffffcc'); }
+      else if (d.kind === 'orb') { const b = Math.sin(t * 2 + d.s) * 2; c.fillStyle = '#ffe08a'; c.beginPath(); c.arc(x, y - 10 + b, 3, 0, 7); c.fill(); R(c, x - 3, y - 1, 6, 1, '#00000040'); }
+    });
+    map.torches.forEach(tc => {
+      const f = Math.sin(t * 12 + tc.x) > 0 ? 1 : 0;
+      R(c, tc.x - 1, tc.y, 2, 6, '#5d4037'); R(c, tc.x - 3, tc.y - 5 - f, 6, 5, '#ff9f1a'); R(c, tc.x - 2, tc.y - 4 - f, 4, 3, '#fff200');
+    });
+  }
+
+  function lightPass() {
+    const dk = [0.22, 0.42, 0.5][Math.floor((stage - 1) / 5) % 3];
+    if (!darkCv) darkCv = document.createElement('canvas');
+    if (darkCv.width !== VW || darkCv.height !== VH) { darkCv.width = VW; darkCv.height = VH; }
+    const d = darkCv.getContext('2d');
+    d.globalCompositeOperation = 'source-over';
+    d.clearRect(0, 0, VW, VH);
+    d.fillStyle = `rgba(8,6,20,${dk})`; d.fillRect(0, 0, VW, VH);
+    d.globalCompositeOperation = 'destination-out';
+    const hole = (x, y, r, a = 1) => {
+      const lx = x - camX, ly = y - camY;
+      if (lx < -r || ly < -r || lx > VW + r || ly > VH + r) return;
+      const gr = d.createRadialGradient(lx, ly, 0, lx, ly, r); gr.addColorStop(0, `rgba(0,0,0,${a})`); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      d.fillStyle = gr; d.fillRect(lx - r, ly - r, r * 2, r * 2);
+    };
+    hole(player.x, player.y - 8, 120);
+    map.torches.forEach(tc => hole(tc.x, tc.y, 60 + Math.sin(t * 9 + tc.x) * 4));
+    map.glows.forEach(gl => hole(gl.x, gl.y, gl.r, 0.8));
+    bullets.forEach(b => hole(b.x, b.y, 14, 0.6));
+    if (portal) hole(portal.x, portal.y, 60);
+    if (chest) hole(chest.x, chest.y, 36);
+    c.drawImage(darkCv, Math.round(camX), Math.round(camY));
+    c.save(); c.globalCompositeOperation = 'lighter';
+    const glow = (x, y, r, col, a) => { const gr = c.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, `rgba(${col},${a})`); gr.addColorStop(1, `rgba(${col},0)`); c.fillStyle = gr; c.fillRect(x - r, y - r, r * 2, r * 2); };
+    map.torches.forEach(tc => glow(tc.x, tc.y - 2, 40, '255,150,50', 0.25 + 0.05 * Math.sin(t * 9 + tc.x)));
+    map.glows.forEach(gl => glow(gl.x, gl.y, gl.r, gl.col, 0.18 + 0.06 * Math.sin(t * 3 + gl.x)));
+    if (portal) glow(portal.x, portal.y, 50, '80,255,180', 0.3);
+    c.restore();
+  }
+
   function render() {
     const tm = theme();
     camX = Math.max(0, Math.min(map.w * TS - VW, player.x - VW / 2));
@@ -539,17 +647,17 @@ const Game = (() => {
     c.imageSmoothingEnabled = false;
     c.setTransform(scale, 0, 0, scale, offX - Math.round((camX + sx) * scale), offY - Math.round((camY + sy) * scale));
     c.save(); c.beginPath(); c.rect(camX, camY, VW, VH); c.clip();
-    // 地圖
+    // 地圖（地板與牆面已預先畫好）
+    c.drawImage(map.layer, 0, 0);
     for (let y = 0; y < map.h; y++) for (let x = 0; x < map.w; x++) {
-      const v = map.tiles[y * map.w + x], px = x * TS, py = y * TS;
-      if (v === 1) {
-        R(c, px, py, TS, TS, tm.wall); R(c, px, py, TS, 2, tm.face);
-        if (y + 1 < map.h && map.tiles[(y + 1) * map.w + x] !== 1) { R(c, px, py + 6, TS, 10, tm.face); R(c, px, py + 14, TS, 2, '#00000040'); }
-      } else {
-        R(c, px, py, TS, TS, (x + y) % 2 ? tm.a : tm.b);
-        if (v === 2) { R(c, px + 1, py + 1, 14, 14, tm.crate); R(c, px + 1, py + 1, 14, 2, '#ffffff30'); R(c, px + 3, py + 7, 10, 1, '#00000050'); R(c, px + 7, py + 3, 1, 10, '#00000050'); }
-      }
+      if (map.tiles[y * map.w + x] !== 2) continue;
+      const px = x * TS, py = y * TS;
+      R(c, px + 1, py + 13, 14, 3, '#00000040');
+      R(c, px + 1, py, 14, 14, tm.crate); R(c, px + 1, py, 14, 2, '#ffffff40'); R(c, px + 1, py + 12, 14, 2, '#00000040');
+      R(c, px + 3, py + 6, 10, 1, '#00000050'); R(c, px + 7, py + 2, 1, 10, '#00000050');
+      R(c, px + 2, py + 1, 1, 1, '#ffffff80'); R(c, px + 13, py + 1, 1, 1, '#ffffff80');
     }
+    drawDeco();
     // 傳送門
     if (portal) {
       const g = 0.5 + 0.5 * Math.sin(t * 5);
@@ -598,6 +706,7 @@ const Game = (() => {
       if (!b.friendly) { c.fillStyle = '#fff'; c.beginPath(); c.arc(b.x, b.y, 1, 0, 7); c.fill(); }
     });
     parts.forEach(p => R(c, p.x, p.y, p.s, p.s, p.col));
+    lightPass();
     c.restore();
     hud();
   }
