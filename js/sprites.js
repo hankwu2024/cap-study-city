@@ -49,7 +49,15 @@ const PROPS = {
     R(c, x + 20, y + 1, 2, 6, '#e67e22');
   } },
   chair: { w: 1, h: 1, draw(c, x, y) {
-    R(c, x + 4, y + 2, 8, 4, C.woodD); R(c, x + 3, y + 6, 10, 6, C.wood); R(c, x + 4, y + 12, 2, 3, C.woodD); R(c, x + 10, y + 12, 2, 3, C.woodD);
+    shadow(c, x + 8, y + 15, 6, 2);
+    R(c, x + 4, y + 1, 8, 5, C.woodD); R(c, x + 5, y + 2, 6, 1, C.woodL); R(c, x + 3, y + 6, 10, 6, C.wood); R(c, x + 3, y + 6, 10, 1, C.woodL); R(c, x + 4, y + 12, 2, 3, C.woodD); R(c, x + 10, y + 12, 2, 3, C.woodD);
+  } },
+  // 面向書桌（椅背在下方）
+  chairUp: { w: 1, h: 1, draw(c, x, y) {
+    shadow(c, x + 8, y + 15, 6, 2);
+    R(c, x + 4, y + 10, 2, 5, C.woodD); R(c, x + 10, y + 10, 2, 5, C.woodD);
+    R(c, x + 3, y + 3, 10, 6, C.wood); R(c, x + 3, y + 3, 10, 1, C.woodL);
+    R(c, x + 3, y + 8, 10, 5, C.woodD); R(c, x + 4, y + 9, 8, 1, C.woodL); R(c, x + 5, y + 11, 6, 1, '#5a3a1e');
   } },
   board: { w: 3, h: 1, wall: true, draw(c, x, y, t, o) {
     R(c, x + 1, y + 1, 46, 13, C.woodD); R(c, x + 3, y + 2, 42, 10, o.color || '#2f5d50');
@@ -466,8 +474,44 @@ const PROPS = {
 };
 
 // 設定每種家具顏色用的小幫手
+// 家具自動加上深色描邊：先畫到小畫布，再把描邊算出來（靜態家具會快取，動態的每秒更新 15 次）
+const PROP_OUTLINE = [26, 19, 32];
+const _propStatic = new Map();
+const _propAnim = new WeakMap();
+const PROP_STATIC = new Set(['desk', 'chair', 'chairUp', 'bookshelf', 'sofa', 'inkDesk', 'scrollStand', 'abcBlocks', 'mailbox', 'phoneBooth', 'abacus', 'easelPi',
+  'ballotBox', 'gavelDesk', 'mountain', 'signpost', 'vase', 'pillar', 'rocks', 'microscope', 'reception', 'weaponRack', 'cabinet', 'ticketBooth', 'bush', 'rock',
+  'bench', 'boxes', 'paperStack', 'signboard', 'mat', 'tree']);
+function _outlineProp(def, p, t) {
+  const pad = 10, top = 18;
+  const cv = document.createElement('canvas');
+  cv.width = p.w * T + pad * 2; cv.height = p.h * T + top + pad;
+  const c = cv.getContext('2d');
+  def.draw(c, pad, top, t, p);
+  const img = c.getImageData(0, 0, cv.width, cv.height), d = img.data, W = cv.width, H = cv.height;
+  const a = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? 0 : d[(y * W + x) * 4 + 3];
+  const mark = [];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (a(x, y) >= 100) continue;
+    if (a(x - 1, y) >= 200 || a(x + 1, y) >= 200 || a(x, y - 1) >= 200 || a(x, y + 1) >= 200) mark.push((y * W + x) * 4);
+  }
+  mark.forEach(i => { d[i] = PROP_OUTLINE[0]; d[i + 1] = PROP_OUTLINE[1]; d[i + 2] = PROP_OUTLINE[2]; d[i + 3] = 255; });
+  c.putImageData(img, 0, 0);
+  return { cv, pad, top };
+}
 function drawProp(c, p, t) {
   const def = PROPS[p.type];
   if (!def) return;
-  def.draw(c, p.px, p.py, t, p);
+  if (def.wall || def.flat || def.ground || p.noOutline) { def.draw(c, p.px, p.py, t, p); return; }
+  let o;
+  if (PROP_STATIC.has(p.type)) {
+    const key = p.type + '|' + (p.color || '');
+    o = _propStatic.get(key);
+    if (!o) { o = _outlineProp(def, p, 0); _propStatic.set(key, o); }
+  } else {
+    const frame = Math.floor(t * 15) + (typeof nightLevel === 'function' ? Math.round(nightLevel() * 3) * 100000 : 0);
+    const slot = _propAnim.get(p);
+    if (slot && slot.frame === frame) o = slot.o;
+    else { o = _outlineProp(def, p, t + (p.px % 97) * 0.13); _propAnim.set(p, { frame, o }); }
+  }
+  c.drawImage(o.cv, Math.round(p.px - o.pad), Math.round(p.py - o.top));
 }

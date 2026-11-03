@@ -16,6 +16,17 @@ function skyColors() {
 }
 
 Object.assign(PROPS, {
+  // 建築外牆上的城門（和城門房間裡的傳送門對齊，外面的小路從這裡出去）
+  outerGate: { w: 3, h: 1, wall: true, draw(c, x, y, t) {
+    R(c, x - 2, y - 2, 52, 18, '#8d8d8d'); R(c, x - 2, y - 2, 52, 2, '#b0b0b0');
+    R(c, x + 4, y + 1, 40, 15, '#3b2a1a');
+    c.fillStyle = '#5d4037'; c.beginPath(); c.moveTo(x + 6, y + 16); c.lineTo(x + 6, y + 6); c.quadraticCurveTo(x + 24, y - 3, x + 42, y + 6); c.lineTo(x + 42, y + 16); c.fill();
+    R(c, x + 23, y + 3, 2, 13, '#3b2a1a');
+    for (let k = 0; k < 3; k++) { R(c, x + 8, y + 7 + k * 3, 14, 1, '#4a3222'); R(c, x + 26, y + 7 + k * 3, 14, 1, '#4a3222'); }
+    R(c, x + 19, y + 9, 2, 2, '#f1c40f'); R(c, x + 27, y + 9, 2, 2, '#f1c40f');
+    const g = 0.5 + 0.5 * Math.sin(t * 2.5); R(c, x + 6, y + 15, 36, 1, `rgba(80,255,180,${0.4 + g * 0.4})`);
+    R(c, x + 18, y - 1, 12, 3, '#f1c40f');
+  } },
   window: { w: 2, h: 1, wall: true, draw(c, x, y, t, o) {
     const [a, b] = skyColors();
     R(c, x + 2, y + 1, 28, 13, '#e8e2d6');

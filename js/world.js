@@ -12,7 +12,7 @@ const World = (() => {
   let t = 0, last = 0, running = false, paused = false;
   const keys = {};
   const player = { x: 0, y: 0, dir: 0, moving: false, path: null, onArrive: null };
-  const cat = { x: 0, y: 0, tx: 0, ty: 0, dir: 3, wait: 0 };
+  const cat = { x: 0, y: 0, dir: 3, wait: 1, state: 'sit', path: null, heart: 0 };
   const fx = [];
   const motes = [];
   const critters = [];
@@ -103,11 +103,10 @@ const World = (() => {
         if (lv >= 6) P(r, 'rug', 3, 3, { color: s.color });
         P(r, 'board', 0, -1, { color: s.color, action: 'progress:' + s.id, label: '學習進度' });
         P(r, 'uploadStation', 8, 0, { color: s.color, action: 'upload:' + s.id, label: '⬆ 上傳考卷', bright: true, below: true });
-        P(r, 'desk', 4, 4); P(r, 'chair', 5, 5);
+        P(r, 'desk', 4, 4); P(r, 'chairUp', 5, 5);
         if (top) { P(r, 'window', 3, -1, { color: s.color }); P(r, 'clock', 6, -1); P(r, 'poster', 10, -1, { color: s.color }); }
         else { P(r, 'clock', 3, -1); P(r, 'poster', 7, -1, { color: s.color }); P(r, 'poster', 10, -1, { color: '#f1c40f' }); }
         P(r, 'plant', 2, top ? 0 : 2);
-        P(r, 'paperStack', 3, top ? 7 : 6);
         THEME[r.id].forEach((type, i) => {
           const [x, y, need] = SLOTS[i];
           if (lv >= need) P(r, type, x, y);
@@ -117,13 +116,13 @@ const World = (() => {
       } else if (r.kind === 'lobby') {
         P(r, 'countdown', 2, -1, { action: 'roundtable' });
         P(r, 'mural', 19, -1, { action: 'roundtable' });
-        P(r, 'clock', 11, -1); P(r, 'clock', 17, -1);
+        P(r, 'clock', 11, -1); P(r, 'poster', 17, -1, { color: '#c9a227' });
         P(r, 'roundTable', 13, 5, { action: 'roundtable', label: '圓桌：各科進度總覽', bright: true });
         P(r, 'sofa', 2, 4, { color: '#b5651d' }); P(r, 'sofa', 2, 8, { color: '#b5651d' }); P(r, 'sideTable', 5, 6);
         P(r, 'sofa', 24, 4, { color: '#4a6fa5' }); P(r, 'sofa', 24, 8, { color: '#4a6fa5' }); P(r, 'sideTable', 23, 6);
         [[0, 0], [28, 0], [0, 12], [28, 12], [10, 0], [18, 0], [11, 12], [17, 12]].forEach(([x, y]) => P(r, 'plant', x, y));
-        P(r, 'fountain', 8, 5); P(r, 'vending', 21, 5); P(r, 'reception', 22, 11);
-        P(r, 'lamp', 5, 11); P(r, 'bigPlant', 9, 9); P(r, 'lamp', 1, 6); P(r, 'lamp', 27, 6);
+        P(r, 'fountain', 8, 5); P(r, 'vending', 28, 5); P(r, 'reception', 22, 11);
+        P(r, 'lamp', 5, 11); P(r, 'bigPlant', 9, 9); P(r, 'lamp', 1, 6); P(r, 'lamp', 27, 10);
       } else if (r.kind === 'train') {
         P(r, 'mat', 4, 4);
         P(r, 'altar', 6, 5, { action: 'train', label: '修練卷軸：錯題重練', bright: true });
@@ -138,7 +137,7 @@ const World = (() => {
         P(r, 'readingDesk', 6, 5, { action: 'exams', label: '歷屆試題與出題率', bright: true });
         P(r, 'cabinet', 0, 6); P(r, 'cabinet', 14, 6);
         P(r, 'globe', 0, 10); P(r, 'lamp', 14, 10); P(r, 'plant', 0, 12); P(r, 'plant', 14, 12);
-        P(r, 'chair', 7, 8); P(r, 'paperStack', 4, 6); P(r, 'paperStack', 10, 6); P(r, 'boxes', 13, 12);
+        P(r, 'chairUp', 7, 7); P(r, 'sideTable', 4, 6); P(r, 'boxes', 13, 12);
         P(r, 'rug', 5, 9, { color: '#1f4e79' });
       } else if (r.kind === 'gate') {
         P(r, 'gate', 4, 7, { action: 'gate', label: '前往城外（需要出城令）', bright: true });
@@ -165,6 +164,7 @@ const World = (() => {
     for (let x = BX + 2; x < BX + 64; x += 8) { A('lampPost', x, BY - 4); A('lampPost', x + 4, BY + 44); }
     for (let y = BY + 4; y < BY + 42; y += 9) { A('lampPost', BX - 3, y); A('lampPost', BX + 66, y); }
     for (let x = BX + 4; x < BX + 62; x += 8) A('flowerBed', x, BY - 2);
+    A('outerGate', BX + 57, BY + 42);
     A('signboard', BX + 54, BY + 45, { label: '🏯 會考學習城', sign: true });
     A('pond', 1, H - 8);
     A('bench', BX + 30, BY + 45); A('bench', BX + 20, BY + 45);
@@ -441,39 +441,56 @@ const World = (() => {
       const d = Math.hypot(cx - player.x, cy - (player.y - 6));
       if (d < best) { best = d; nearProp = p; }
     });
-    // 小貓
-    const lobby = rooms.find(r => r.id === 'lobby');
-    if (cat.wait > 0) cat.wait -= dt;
-    else {
-      const dx = cat.tx - cat.x, dy = cat.ty - cat.y, d = Math.hypot(dx, dy);
-      if (d < 1) {
-        cat.wait = 1 + Math.random() * 3;
-        for (let k = 0; k < 20; k++) {
-          const tx = lobby.ix + Math.floor(Math.random() * lobby.iw), ty = lobby.iy + Math.floor(Math.random() * lobby.ih);
-          if (!solid[idx(tx, ty)]) { cat.tx = tx * T + 8; cat.ty = ty * T + 12; break; }
-        }
-      } else {
-        const nx = cat.x + dx / d * 30 * dt, ny = cat.y + dy / d * 30 * dt;
-        if (!blocked(nx, ny)) { cat.x = nx; cat.y = ny; } else { cat.wait = 0.2; cat.tx = cat.x; cat.ty = cat.y; }
-        cat.dir = dx < 0 ? 2 : 3;
-      }
-    }
+    updateCat(dt);
     for (let i = fx.length - 1; i >= 0; i--) { const f = fx[i]; f.life -= dt; f.x += f.vx * dt; f.y += f.vy * dt; f.vy += (f.g ?? 30) * dt; if (f.life <= 0) fx.splice(i, 1); }
     if (Math.abs(nightLevel() - lastNight) > 0.15) renderStatic();
   }
 
   // ---------- 繪製 ----------
+  // 小貓：在大廳走走停停，會坐下、睡覺，玩家靠近時會冒愛心
+  function updateCat(dt) {
+    const lobby = rooms.find(r => r.id === 'lobby');
+    const near = Math.hypot(player.x - cat.x, player.y - cat.y) < 28;
+    cat.heart = near ? Math.min(1, (cat.heart || 0) + dt) : Math.max(0, (cat.heart || 0) - dt);
+    if (cat.path && cat.path.length) {
+      const [tx, ty] = cat.path[0];
+      const gx = tx * T + 8, gy = ty * T + 12, dx = gx - cat.x, dy = gy - cat.y, d = Math.hypot(dx, dy);
+      if (d < 1.5) { cat.path.shift(); if (!cat.path.length) { cat.path = null; cat.state = Math.random() < 0.3 ? 'sleep' : 'sit'; cat.wait = cat.state === 'sleep' ? 6 + Math.random() * 6 : 1.5 + Math.random() * 3; } }
+      else { const sp = 28; cat.x += dx / d * sp * dt; cat.y += dy / d * sp * dt; if (Math.abs(dx) > 0.5) cat.dir = dx < 0 ? 2 : 3; }
+      return;
+    }
+    cat.state = cat.state || 'sit';
+    if (near && cat.state === 'sleep') cat.state = 'sit';
+    cat.wait -= dt;
+    if (cat.wait > 0) return;
+    // 選下一個目的地：大廳裡的空地，偶爾走到玩家旁邊
+    let goal = null;
+    const inLobby = (x, y) => x >= lobby.ix && x < lobby.ix + lobby.iw && y >= lobby.iy && y < lobby.iy + lobby.ih;
+    const ptx = Math.floor(player.x / T), pty = Math.floor((player.y - 2) / T);
+    if (Math.random() < 0.35 && inLobby(ptx, pty)) {
+      for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (inLobby(ptx + ox, pty + oy) && !solid[idx(ptx + ox, pty + oy)]) { goal = [ptx + ox, pty + oy]; break; }
+    }
+    for (let k = 0; !goal && k < 30; k++) {
+      const tx = lobby.ix + Math.floor(Math.random() * lobby.iw), ty = lobby.iy + Math.floor(Math.random() * lobby.ih);
+      if (!solid[idx(tx, ty)]) goal = [tx, ty];
+    }
+    const path = goal && findPath(Math.floor(cat.x / T), Math.floor((cat.y - 2) / T), [goal]);
+    if (path && path.length) { cat.path = path; cat.state = 'walk'; } else cat.wait = 1;
+  }
+
   function drawCat(c) {
-    const x = Math.round(cat.x), y = Math.round(cat.y), m = cat.wait <= 0 && Math.floor(t * 8) % 2;
-    shadow(c, x, y, 5, 2);
-    const f = cat.dir === 2 ? -1 : 1;
-    R(c, x - 6, y - 8, 12, 7, '#1a1320');
-    R(c, x - 5, y - 7, 10, 5, '#f39c12'); R(c, x - 3, y - 6, 2, 3, '#e67e22'); R(c, x + 1, y - 6, 2, 3, '#e67e22');
-    R(c, x - 4, y - 2 - m, 2, 2, '#e67e22'); R(c, x + 2, y - 2 + m - 1, 2, 2, '#e67e22');
-    R(c, x + f * 4 - 3, y - 11, 6, 5, '#f39c12'); R(c, x + f * 4 - 3, y - 13, 2, 2, '#f39c12'); R(c, x + f * 4 + 1, y - 13, 2, 2, '#f39c12');
-    R(c, x + f * 4 + (f > 0 ? 1 : -2), y - 9, 1, 1, '#222'); R(c, x + f * 4 - 2, y - 8, 1, 1, '#ffb3b3');
-    R(c, x - f * 6 - (f > 0 ? 1 : 0), y - 10 + Math.round(Math.sin(t * 4)), 2, 5, '#e67e22');
-    if (cat.wait > 2.5) { R(c, x + 6, y - 18 - Math.floor(t * 2) % 3, 3, 1, '#ffffffaa'); R(c, x + 7, y - 19 - Math.floor(t * 2) % 3, 1, 3, '#ffffffaa'); }
+    const pose = cat.state === 'walk' ? 'walk' : cat.state === 'sleep' ? 'sleep' : 'sit';
+    drawCatSprite(c, cat.x, cat.y, pose, cat.dir, t);
+    if (pose === 'sleep') {
+      const p = (t * 0.6) % 1;
+      c.globalAlpha = 1 - p; c.fillStyle = '#ffffff';
+      c.font = 'bold 5px sans-serif'; c.fillText('z', cat.x + 4 + p * 4, cat.y - 12 - p * 8);
+      c.globalAlpha = 1;
+    }
+    if (cat.heart > 0.6 && pose !== 'walk') {
+      const b = Math.sin(t * 4) * 1, x = Math.round(cat.x), y = Math.round(cat.y - 15 + b);
+      R(c, x - 2, y, 2, 1, '#ff5d7a'); R(c, x + 1, y, 2, 1, '#ff5d7a'); R(c, x - 2, y + 1, 5, 1, '#ff5d7a'); R(c, x - 1, y + 2, 3, 1, '#ff5d7a'); R(c, x, y + 3, 1, 1, '#ff5d7a');
+    }
   }
 
   function drawLights(vw, vh) {
@@ -700,7 +717,7 @@ const World = (() => {
       scale = window.innerWidth >= 1500 ? 3 : 2;
       const [x, y] = roomCenter('lobby');
       player.x = x; player.y = y + 3 * T;
-      cat.x = cat.tx = x + 40; cat.y = cat.ty = y + 40;
+      cat.x = x + 40; cat.y = y + 44;
       for (let i = 0; i < 14; i++) critters.push({ x: Math.random() * W * T, y: [BY - 4, BY + 45, BY + 50][i % 3] * T + Math.random() * 30, a: Math.random() * 7, s: 1 + Math.random(), dx: (Math.random() - 0.5) * 16, col: ['#ffd93d', '#ff8fab', '#ffffff', '#a0c4ff'][i % 4] });
       bindInput();
     },

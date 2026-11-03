@@ -473,42 +473,26 @@ const Game = (() => {
   function drawEnemy(e) {
     const x = Math.round(e.x), y = Math.round(e.y);
     if (e.spawnT > 0) {
-      c.strokeStyle = `rgba(255,80,80,${0.5 + 0.5 * Math.sin(t * 20)})`; c.beginPath(); c.arc(x, y - 3, e.r + 3, 0, 7); c.stroke(); return;
+      const p = 1 - e.spawnT / 0.7;
+      c.strokeStyle = `rgba(255,80,80,${0.5 + 0.5 * Math.sin(t * 20)})`; c.beginPath(); c.ellipse(x, y - 1, e.r + 4 - p * 3, (e.r + 4 - p * 3) / 2, 0, 0, 7); c.stroke();
+      R(c, x - 1, y - 4 - p * 6, 2, 2, '#ff8080');
+      return;
     }
-    const fl = e.flash > 0;
-    const col = k => fl ? '#fff' : k;
-    shadow(c, x, y, e.r, 2);
-    if (e.type === 'slime') {
-      const sq = Math.sin(e.ph * 8) * 1.5;
-      c.fillStyle = col('#6ab04c'); c.beginPath(); c.ellipse(x, y - 5, 7 + sq, 6 - sq, 0, 0, 7); c.fill();
-      R(c, x - 3, y - 7, 2, 2, '#111'); R(c, x + 2, y - 7, 2, 2, '#111'); R(c, x - 4, y - 9, 3, 1, '#badc58');
-    } else if (e.type === 'bat') {
-      const w = Math.sin(e.ph * 20) > 0 ? 3 : -1;
-      R(c, x - 9, y - 10 - w, 6, 3, col('#5f27cd')); R(c, x + 3, y - 10 - w, 6, 3, col('#5f27cd'));
-      R(c, x - 4, y - 12, 8, 7, col('#8e44ad')); R(c, x - 2, y - 10, 1, 1, '#ff4757'); R(c, x + 1, y - 10, 1, 1, '#ff4757');
-    } else if (e.type === 'archer') {
-      R(c, x - 4, y - 8, 8, 7, col('#e67e22')); R(c, x - 4, y - 15, 8, 7, col('#78e08f')); R(c, x - 2, y - 12, 1, 2, '#111'); R(c, x + 2, y - 12, 1, 2, '#111');
-      R(c, x - 6, y - 17, 2, 4, col('#78e08f')); R(c, x + 4, y - 17, 2, 4, col('#78e08f'));
-      R(c, x + 5, y - 13, 1, 10, '#8b5a2b');
-    } else if (e.type === 'wisp') {
-      const f = Math.sin(e.ph * 10);
-      c.fillStyle = fl ? '#fff' : 'rgba(34,166,179,.35)'; c.beginPath(); c.arc(x, y - 7, 9, 0, 7); c.fill();
-      R(c, x - 4, y - 11, 8, 8, col('#7efff5')); R(c, x - 2, y - 14 - f, 4, 3, col('#c7ecee')); R(c, x - 2, y - 8, 1, 2, '#130f40'); R(c, x + 1, y - 8, 1, 2, '#130f40');
-    } else if (e.type === 'knight') {
-      R(c, x - 6, y - 15, 12, 14, col('#7f8c8d')); R(c, x - 5, y - 18, 10, 5, col('#95a5a6')); R(c, x - 3, y - 15, 6, 1, '#e74c3c');
-      R(c, x - 8, y - 12, 3, 9, col('#576574')); R(c, x - 3, y - 2, 2, 2, '#2d3436'); R(c, x + 1, y - 2, 2, 2, '#2d3436');
-    } else if (e.type === 'boss') {
-      const th = Math.floor((stage - 1) / 5) % 3;
-      const body = ['#27ae60', '#c0392b', '#6c5ce7'][th];
-      const b = Math.sin(e.ph * 3) * 1.5;
-      R(c, x - 14, y - 26 + b, 28, 24, col(body)); R(c, x - 12, y - 28 + b, 24, 4, col(body));
-      R(c, x - 10, y - 32 + b, 4, 4, '#f1c40f'); R(c, x - 2, y - 34 + b, 4, 6, '#f1c40f'); R(c, x + 6, y - 32 + b, 4, 4, '#f1c40f'); R(c, x - 10, y - 29 + b, 20, 2, '#f1c40f');
-      R(c, x - 8, y - 20 + b, 5, 4, '#fff'); R(c, x + 3, y - 20 + b, 5, 4, '#fff');
-      R(c, x - 6, y - 19 + b, 2, 2, '#111'); R(c, x + 5, y - 19 + b, 2, 2, '#111');
-      R(c, x - 6, y - 11 + b, 12, 2, '#2d3436');
-      if (e.charge > 0) { c.strokeStyle = '#ff4757'; c.strokeRect(x - 16, y - 30, 32, 30); }
-    }
-    if (e.type !== 'boss' && e.hp < e.maxHp) { R(c, x - 6, y - 22, 12, 2, '#2d3436'); R(c, x - 6, y - 22, Math.max(0, 12 * e.hp / e.maxHp), 2, '#ff4757'); }
+    const th = Math.floor((stage - 1) / 5) % 3;
+    const set = enemyFrames(e.type, th);
+    const fi = set.frames.length > 1 ? Math.floor(t * 8 + e.ph) % 2 : 0;
+    const img = e.flash > 0 ? set.white[fi] : set.frames[fi];
+    let w = img.width / 2, h = img.height / 2;
+    shadow(c, x, y, Math.max(5, e.r), e.type === 'boss' ? 4 : 2);
+    let sx = 1, sy = 1, lift = 0;
+    if (e.type === 'slime') { const q = Math.sin(e.ph * 8) * 0.08; sx = 1 + q; sy = 1 - q; }
+    if (e.type === 'boss') { const q = Math.sin(e.ph * 3) * 0.04; sx = 1 + q; sy = 1 - q; if (e.charge > 0) sx *= 1.05; }
+    if (e.type === 'bat' || e.type === 'wisp') lift = 6 + Math.sin(e.ph * 4) * 2;
+    const flip = player.x < e.x;
+    c.save(); c.translate(x, y - lift); if (flip && e.type !== 'boss') c.scale(-1, 1);
+    c.drawImage(img, -w * sx / 2, -h * sy + 1, w * sx, h * sy);
+    c.restore();
+    if (e.type !== 'boss' && e.hp < e.maxHp) { const bw = 14, by = y - lift - h - 3; R(c, x - bw / 2 - 1, by - 1, bw + 2, 4, '#1a1320'); R(c, x - bw / 2, by, bw, 2, '#4a2a2a'); R(c, x - bw / 2, by, Math.max(0, bw * e.hp / e.maxHp), 2, '#ff4757'); }
   }
 
   function drawWeapon() {
