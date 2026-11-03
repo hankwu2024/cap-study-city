@@ -20,7 +20,6 @@ const Game = (() => {
     bow: { name: '竹林長弓', cost: 1, rate: 0.45, dmg: 6, speed: 330, spread: 0, count: 1, pierce: true, color: '#a3cb38' },
     fire: { name: '火焰符咒', cost: 2.5, rate: 0.6, dmg: 3, speed: 170, spread: 0.3, count: 3, explode: true, color: '#ff6b6b' },
     blade: { name: '流光刃', melee: true, cost: 0, rate: 0.3, dmg: 5, range: 28, arc: 1.3, color: '#3ad1ff' },
-    spoon: { name: '巨大飯匙', melee: true, cost: 0, rate: 0.36, dmg: 4, range: 26, arc: 1.6, color: '#f5f6fa' },
   };
   const LOOT = ['shotgun', 'laser', 'staff', 'smg', 'bow', 'fire', 'blade'];
   const ENEMY = {
@@ -253,12 +252,18 @@ const Game = (() => {
       bullets.forEach(b => { if (!b.friendly && Math.hypot(b.x - player.x, b.y - player.y) < w.range) { b.life = 0; burst(b.x, b.y, '#fff', 3); } });
       return;
     }
+    const wid = player.weapons[player.cur], hand = handPos();
+    const mz = weaponMuzzle(wid, hand.x, hand.y, a, wid === 'bow' ? 3 : 0);
+    player.flash = 0.07;
     for (let i = 0; i < w.count; i++) {
       const sp = w.count > 1 ? (i / (w.count - 1) - 0.5) * w.spread : (Math.random() - 0.5) * w.spread;
       const ang = a + sp;
-      bullets.push({ x: player.x + Math.cos(a) * 8, y: player.y - 8 + Math.sin(a) * 8, vx: Math.cos(ang) * w.speed, vy: Math.sin(ang) * w.speed,
+      bullets.push({ x: mz.x, y: mz.y, vx: Math.cos(ang) * w.speed, vy: Math.sin(ang) * w.speed, wid,
         r: w.explode ? 3 : 2, dmg: w.dmg, life: 1.4, friendly: true, color: w.color, pierce: w.pierce, homing: w.homing, explode: w.explode, hit: new Set() });
     }
+    // 槍口火花
+    const fc = wid === 'laser' ? '#c7f4ff' : wid === 'staff' ? '#f3d9ff' : wid === 'bow' ? null : '#fff3b0';
+    if (fc) for (let i = 0; i < 4; i++) { const q = a + (Math.random() - 0.5) * 0.9, v = 40 + Math.random() * 50; parts.push({ x: mz.x, y: mz.y, vx: Math.cos(q) * v, vy: Math.sin(q) * v, life: 0.12, col: fc, s: 1 }); }
   }
 
   function hurt(e, dmg, kx, ky) {
@@ -324,7 +329,7 @@ const Game = (() => {
     else if (player.moving) player.aim = Math.atan2(vy, vx);
     if (!player.moving) { const a = player.aim; player.dir = Math.abs(Math.cos(a)) > Math.abs(Math.sin(a)) ? (Math.cos(a) < 0 ? 2 : 3) : (Math.sin(a) < 0 ? 1 : 0); }
     // 計時
-    player.fireCd -= dt; player.skillCd = Math.max(0, player.skillCd - dt); player.inv -= dt; player.speedUp -= dt; player.swing -= dt;
+    player.fireCd -= dt; player.skillCd = Math.max(0, player.skillCd - dt); player.inv -= dt; player.speedUp -= dt; player.swing -= dt; player.flash = (player.flash || 0) - dt;
     player.regen -= dt;
     if (player.regen <= 0 && player.shield < player.maxShield) { player.regenTick -= dt; if (player.regenTick <= 0) { player.shield++; player.regenTick = 1; } }
     if (keys.KeyJ || mouse.down || touchBtn.fire || keys.Space) fire();
@@ -361,6 +366,8 @@ const Game = (() => {
         if (tg2) { const a = Math.atan2(tg2.y - 4 - b.y, tg2.x - b.x), cur = Math.atan2(b.vy, b.vx); let da = Math.atan2(Math.sin(a - cur), Math.cos(a - cur)); const na = cur + Math.max(-4 * dt, Math.min(4 * dt, da)); const s = Math.hypot(b.vx, b.vy); b.vx = Math.cos(na) * s; b.vy = Math.sin(na) * s; }
       }
       b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
+      if (b.wid === 'fire' && Math.random() < 0.7) parts.push({ x: b.x + (Math.random() - 0.5) * 3, y: b.y + (Math.random() - 0.5) * 3, vx: -b.vx * 0.15, vy: -b.vy * 0.15 - 15, life: 0.25, col: Math.random() < 0.5 ? '#ff9f43' : '#ffd32a', s: 1 });
+      if (b.wid === 'staff' && Math.random() < 0.35) parts.push({ x: b.x, y: b.y, vx: 0, vy: 0, life: 0.3, col: '#e0b3ff', s: 1 });
       const tile = tileAt(b.x, b.y);
       if (tile) {
         if (tile === 2 && b.friendly) {
@@ -495,22 +502,44 @@ const Game = (() => {
     if (e.type !== 'boss' && e.hp < e.maxHp) { const bw = 14, by = y - lift - h - 3; R(c, x - bw / 2 - 1, by - 1, bw + 2, 4, '#1a1320'); R(c, x - bw / 2, by, bw, 2, '#4a2a2a'); R(c, x - bw / 2, by, Math.max(0, bw * e.hp / e.maxHp), 2, '#ff4757'); }
   }
 
+  function handPos() { return { x: player.x + Math.cos(player.aim) * 3, y: player.y - 8 + Math.sin(player.aim) * 2 }; }
   function drawWeapon() {
-    const w = weapon();
-    c.save(); c.translate(Math.round(player.x), Math.round(player.y - 9)); c.rotate(player.aim);
+    const w = weapon(), id = player.weapons[player.cur], h = handPos();
     if (w.melee) {
       const sw = player.swing > 0 ? (player.swing / 0.15 - 0.5) * 2.2 : 0.6;
-      c.rotate(sw);
-      R(c, 3, -1, w.range - 10, 3, w.color); R(c, 1, -2, 3, 5, '#636e72');
-      c.restore();
       if (player.swing > 0) {
-        c.strokeStyle = 'rgba(255,255,255,.7)'; c.lineWidth = 2; c.beginPath();
-        c.arc(player.x, player.y - 9, w.range - 4, player.aim - w.arc / 2, player.aim + w.arc / 2); c.stroke(); c.lineWidth = 1;
+        // 劍氣：多層半透明弧線
+        const k = player.swing / 0.15, a0 = player.aim - w.arc / 2, a1 = player.aim + w.arc / 2;
+        c.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < 4; i++) {
+          c.strokeStyle = `rgba(58,209,255,${(0.5 - i * 0.1) * k})`; c.lineWidth = 3 - i * 0.6;
+          c.beginPath(); c.arc(h.x, h.y, w.range - 6 - i * 3, a0, a1); c.stroke();
+        }
+        c.strokeStyle = `rgba(255,255,255,${0.8 * k})`; c.lineWidth = 1; c.beginPath(); c.arc(h.x, h.y, w.range - 5, a0 + 0.2, a1 - 0.2); c.stroke();
+        c.globalCompositeOperation = 'source-over'; c.lineWidth = 1;
       }
+      drawWeaponSprite(c, id, h.x, h.y, player.aim + sw * (Math.cos(player.aim) < 0 ? -1 : 1));
       return;
     }
-    R(c, 3, -2, 10, 4, '#2d3436'); R(c, 5, -1, 8, 2, w.color);
-    c.restore();
+    let pull = 0;
+    if (id === 'bow') pull = Math.max(0, Math.min(3, Math.round((1 - player.fireCd / w.rate) * 3)));
+    const recoil = player.flash > 0 && id !== 'bow' ? 1.5 : 0;
+    const mz = drawWeaponSprite(c, id, h.x, h.y, player.aim, { pull, recoil });
+    // 武器本身的光
+    if (id === 'staff' || id === 'fire' || id === 'laser') {
+      const col = id === 'staff' ? '197,108,240' : id === 'fire' ? '255,140,60' : '72,219,251';
+      const g = 0.6 + 0.4 * Math.sin(performance.now() / 150);
+      c.globalCompositeOperation = 'lighter'; c.fillStyle = `rgba(${col},${0.3 * g})`;
+      c.beginPath(); c.arc(mz.x, mz.y, id === 'staff' ? 4 : 2.5, 0, 7); c.fill(); c.globalCompositeOperation = 'source-over';
+      if (id === 'fire' && Math.random() < 0.5) parts.push({ x: mz.x + (Math.random() - 0.5) * 3, y: mz.y, vx: 0, vy: -20, life: 0.2, col: '#ffb142', s: 1 });
+    }
+    // 槍口火光
+    if (player.flash > 0 && id !== 'bow' && id !== 'staff' && id !== 'fire') {
+      const fc = id === 'laser' ? '#c7f4ff' : '#fff3b0', r = id === 'shotgun' ? 4 : 2.6;
+      c.save(); c.translate(mz.x, mz.y); c.rotate(player.aim); c.fillStyle = fc;
+      c.beginPath(); c.moveTo(0, -r * 0.7); c.lineTo(r * 1.8, 0); c.lineTo(0, r * 0.7); c.lineTo(r * 0.5, 0); c.closePath(); c.fill();
+      c.globalAlpha = 0.5; c.beginPath(); c.arc(0, 0, r, 0, 7); c.fill(); c.restore();
+    }
   }
 
   // ---------- 場景美術 ----------
@@ -660,8 +689,11 @@ const Game = (() => {
       else if (p.kind === 'coin') { R(c, p.x - 2, p.y - 3, 5, 5, '#f9ca24'); R(c, p.x - 1, p.y - 2, 1, 2, '#fff'); }
       else if (p.kind === 'hp') { R(c, p.x - 3, p.y - 6, 6, 7, '#ff4757'); R(c, p.x - 1, p.y - 8, 2, 2, '#dfe6e9'); R(c, p.x - 2, p.y - 4, 1, 2, '#fff'); }
       else if (p.kind === 'weapon') {
-        const b = Math.sin(t * 4) * 1.5; shadow(c, p.x, p.y + 2, 6, 2);
-        R(c, p.x - 7, p.y - 4 + b, 14, 4, '#2d3436'); R(c, p.x - 5, p.y - 3 + b, 10, 2, WEAPONS[p.w].color);
+        const b = Math.sin(t * 4) * 1.5; shadow(c, p.x, p.y + 2, 8, 2);
+        c.globalCompositeOperation = 'lighter'; c.fillStyle = WEAPONS[p.w].color + '40';
+        c.beginPath(); c.ellipse(p.x, p.y + 1, 11, 4, 0, 0, 7); c.fill(); c.globalCompositeOperation = 'source-over';
+        drawWeaponIcon(c, p.w, p.x, p.y - 6 + b, 24, 18, p.w === 'bow' ? 0 : -0.3);
+        if (Math.random() < 0.05) parts.push({ x: p.x + (Math.random() - 0.5) * 16, y: p.y - 6, vx: 0, vy: -12, life: 0.5, col: '#fff', s: 1 });
       }
     });
     if (chest) {
@@ -686,6 +718,7 @@ const Game = (() => {
     list.sort((a, b) => a.y - b.y).forEach(o => o.d());
     // 子彈
     bullets.forEach(b => {
+      if (b.wid) { drawProjectile(c, b, t); return; }
       c.fillStyle = b.color; c.beginPath(); c.arc(b.x, b.y, b.r, 0, 7); c.fill();
       if (!b.friendly) { c.fillStyle = '#fff'; c.beginPath(); c.arc(b.x, b.y, 1, 0, 7); c.fill(); }
     });
@@ -732,9 +765,11 @@ const Game = (() => {
     const wx = cv.width - 230, wy = cv.height - (isTouch ? 230 : 90);
     c.fillStyle = 'rgba(20,20,30,.75)'; c.fillRect(wx, wy, 218, 76);
     player.weapons.forEach((id, i) => {
-      const w = WEAPONS[id];
-      c.font = font(14); c.textAlign = 'left'; c.fillStyle = i === player.cur ? '#ffd32a' : '#aaa';
-      c.fillText(`${i === player.cur ? '▶ ' : '　'}${w.name}${w.cost ? `（⚡${w.cost}）` : ''}`, wx + 10, wy + 22 + i * 20);
+      const w = WEAPONS[id], on = i === player.cur, iy = wy + 14 + i * 22;
+      c.fillStyle = on ? 'rgba(255,211,42,.18)' : 'rgba(255,255,255,.05)'; c.fillRect(wx + 6, iy - 10, 46, 20);
+      c.globalAlpha = on ? 1 : 0.55; drawWeaponIcon(c, id, wx + 29, iy, 44, 18, id === 'bow' ? -Math.PI / 4 : 0); c.globalAlpha = 1;
+      c.font = font(14); c.textAlign = 'left'; c.fillStyle = on ? '#ffd32a' : '#aaa';
+      c.fillText(`${w.name}${w.cost ? `（⚡${w.cost}）` : ''}`, wx + 58, iy + 5);
     });
     const ready = player.skillCd <= 0;
     c.fillStyle = ready ? '#7efff5' : '#888';
