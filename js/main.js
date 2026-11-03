@@ -34,6 +34,13 @@
     Store.save();
     const d = daysLeft();
     toast(`歡迎回來，${Store.state.profile.name}！會考倒數 ${d >= 0 ? d : 0} 天，加油 💪`);
+    // 城外開放體驗：每個存檔只送一次
+    const gifts = Store.state.gifts || (Store.state.gifts = {});
+    if (!gifts.outsideTrial) {
+      gifts.outsideTrial = true;
+      Store.save();
+      setTimeout(() => giveTicket(1, '城外開放體驗券，到城門去看看吧'), 1200);
+    }
   }
 
   if (!Store.state.profile) Panels.onboarding(enter);
