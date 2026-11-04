@@ -128,18 +128,78 @@ const CHAR_MIGRATE = { lingxiao: 'chiling', xiaoju: 'fengxing', xingyu: 'feihu',
 
 // 載入角色圖（data URL，不受 file:// 限制）
 const _charImg = {};
-function _charSheet(id) {
-  if (_charImg[id]) return _charImg[id].complete && _charImg[id].naturalWidth ? _charImg[id] : null;
-  const im = new Image(); im.src = CHAR_SHEETS[id].src; _charImg[id] = im; return null;
+function _img(key, src) {
+  let im = _charImg[key];
+  if (!im) { im = _charImg[key] = new Image(); im.src = src; }
+  return im.complete && im.naturalWidth ? im : null;
 }
-Object.keys(CHAR_SHEETS).forEach(_charSheet);
+const _charSheet = id => _img(id, CHAR_SHEETS[id].src);
+const _charLayer = id => CHAR_SHEETS[id].layer ? _img(id + ':layer', CHAR_SHEETS[id].layer) : null;
+Object.keys(CHAR_SHEETS).forEach(id => { _charSheet(id); _charLayer(id); });
+
+// 夜刃的赤龍：一列一列畫成波浪，整條龍上下浮動，每隔幾秒昂首一次
+function _drawDragon(c, S, L, w, h, top, t) {
+  const s = S.scale;
+  const roar = Math.max(0, Math.sin(t * 1.6)) ** 6;             // 0~1，昂首的瞬間
+  const lift = Math.sin(t * 2.2) * 1.6 - roar * 2.5;
+  const grow = 1 + roar * 0.08;
+  c.save();
+  c.translate(0, top + h * 0.75); c.scale(grow, grow); c.translate(0, -(top + h * 0.75));
+  for (let r = 0; r < S.h; r++) {
+    // 越靠近龍尾（下方）擺動越大，像在游動
+    const amp = 0.6 + (r / S.h) * 1.6 + roar;
+    const dx = Math.sin(t * 4.2 - r * 0.32) * amp;
+    c.drawImage(L, 0, r, S.w, 1, -w / 2 + dx, top + lift + r * s, w, s + 0.05);
+  }
+  // 發光的那一層（閃爍）
+  c.globalCompositeOperation = 'lighter';
+  c.globalAlpha = 0.15 + 0.15 * Math.sin(t * 7) + roar * 0.35;
+  c.drawImage(L, -w / 2, top + lift, w, h);
+  c.restore();
+  // 龍身散出的火星
+  for (let i = 0; i < 7; i++) {
+    const ph = (t * 0.7 + i * 0.37) % 1;
+    const ex = -w / 2 + ((i * 37) % 100) / 100 * w + Math.sin(t * 3 + i) * 2;
+    const ey = top + h * (0.55 - ph * 0.6);
+    c.globalAlpha = 1 - ph;
+    c.fillStyle = i % 2 ? '#ff2d55' : '#ff8fa3';
+    c.fillRect(Math.round(ex), Math.round(ey), 1, 1);
+  }
+  c.globalAlpha = 1;
+}
+
+// 緋狐的狐火：每團各自上下飄、左右晃、火焰伸縮，還會冒出火星
+function _drawFoxFires(c, S, L, w, top, t) {
+  const s = S.scale;
+  S.boxes.forEach(([bx, by, bw, bh], i) => {
+    const ph = i * 1.9;
+    const dx = Math.cos(t * 1.8 + ph) * 2.2;
+    const dy = Math.sin(t * 2.6 + ph) * 2.8;
+    const st = 1 + 0.18 * Math.sin(t * 11 + ph);             // 火焰伸縮
+    const x = -w / 2 + bx * s + dx, yb = top + (by + bh) * s + dy;
+    const dw = bw * s, dh = bh * s * st;
+    c.save(); c.globalCompositeOperation = 'lighter';
+    const g = c.createRadialGradient(x + dw / 2, yb - dh / 2, 0, x + dw / 2, yb - dh / 2, 6);
+    g.addColorStop(0, 'rgba(255,150,40,0.45)'); g.addColorStop(1, 'rgba(255,150,40,0)');
+    c.fillStyle = g; c.fillRect(x - 6, yb - dh - 6, dw + 12, dh + 12);
+    c.restore();
+    c.drawImage(L, bx, by, bw, bh, x, yb - dh, dw, dh);
+    for (let k = 0; k < 2; k++) {
+      const q = (t * 1.3 + k * 0.5 + i * 0.23) % 1;
+      c.globalAlpha = 1 - q;
+      c.fillStyle = k ? '#ffd32a' : '#ff6b35';
+      c.fillRect(Math.round(x + dw / 2 + Math.sin(t * 5 + k + i) * 1.5), Math.round(yb - dh - q * 7), 1, 1);
+    }
+    c.globalAlpha = 1;
+  });
+}
 
 // (x, y) 是腳底中心；dir 0下 1上 2左 3右。上下走時保持上一次的左右朝向
 function drawChar(c, ch, x, y, dir, t, moving) {
   t = Math.abs(t);
-  const S = CHAR_SHEETS[ch.id], img = _charSheet(ch.id);
+  const S = CHAR_SHEETS[ch.id], img = _charSheet(ch.id), L = _charLayer(ch.id);
   if (dir === 2) c._charFace = -1; else if (dir === 3) c._charFace = 1;
-  const face = c._charFace || 1;
+  const face = (c._charFace || 1) * S.face;
   let f;
   if (moving) f = 3 + Math.floor(t * 9) % 4;
   else f = (t % 3.3) < 0.14 ? 2 : Math.floor(t * 1.6) % 2;
@@ -148,22 +208,19 @@ function drawChar(c, ch, x, y, dir, t, moving) {
   shadow(c, x, y, Math.max(7, w * 0.3), 2.5);
   if (!img) return;
   const top = y - h + 1;
-  // 光環：緋狐的狐火、夜刃的赤龍會發光脈動
   if (S.glow !== 'none') {
     const p = 0.5 + 0.5 * Math.sin(t * 4);
     c.save(); c.globalCompositeOperation = 'lighter';
     const g = c.createRadialGradient(x, y - h * 0.55, 2, x, y - h * 0.55, w * 0.7);
     const col = S.glow === 'dragon' ? '255,40,70' : '255,140,40';
-    g.addColorStop(0, `rgba(${col},${0.22 + 0.12 * p})`); g.addColorStop(1, `rgba(${col},0)`);
+    g.addColorStop(0, `rgba(${col},${0.2 + 0.12 * p})`); g.addColorStop(1, `rgba(${col},0)`);
     c.fillStyle = g; c.fillRect(x - w, y - h * 1.3, w * 2, h * 1.6);
     c.restore();
   }
   c.save(); c.translate(x, 0); c.scale(face, 1);
+  if (L && S.glow === 'dragon') _drawDragon(c, S, L, w, h, top, t);
   c.drawImage(img, f * S.w, 0, S.w, S.h, -w / 2, top, w, h);
-  if (S.glow === 'dragon') {   // 赤龍氣場閃爍
-    c.globalCompositeOperation = 'lighter'; c.globalAlpha = 0.07 + 0.07 * Math.sin(t * 5);
-    c.drawImage(img, f * S.w, 0, S.w, S.h, -w / 2, top, w, h);
-  }
+  if (L && S.glow === 'fire') _drawFoxFires(c, S, L, w, top, t);
   c.restore();
 }
 
