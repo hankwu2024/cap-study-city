@@ -16,16 +16,59 @@ function skyColors() {
 }
 
 Object.assign(PROPS, {
-  // 建築外牆上的城門（和城門房間裡的傳送門對齊，外面的小路從這裡出去）
-  outerGate: { w: 3, h: 1, wall: true, draw(c, x, y, t) {
-    R(c, x - 2, y - 2, 52, 18, '#8d8d8d'); R(c, x - 2, y - 2, 52, 2, '#b0b0b0');
-    R(c, x + 4, y + 1, 40, 15, '#3b2a1a');
-    c.fillStyle = '#5d4037'; c.beginPath(); c.moveTo(x + 6, y + 16); c.lineTo(x + 6, y + 6); c.quadraticCurveTo(x + 24, y - 3, x + 42, y + 6); c.lineTo(x + 42, y + 16); c.fill();
-    R(c, x + 23, y + 3, 2, 13, '#3b2a1a');
-    for (let k = 0; k < 3; k++) { R(c, x + 8, y + 7 + k * 3, 14, 1, '#4a3222'); R(c, x + 26, y + 7 + k * 3, 14, 1, '#4a3222'); }
-    R(c, x + 19, y + 9, 2, 2, '#f1c40f'); R(c, x + 27, y + 9, 2, 2, '#f1c40f');
-    const g = 0.5 + 0.5 * Math.sin(t * 2.5); R(c, x + 6, y + 15, 36, 1, `rgba(80,255,180,${0.4 + g * 0.4})`);
-    R(c, x + 18, y - 1, 12, 3, '#f1c40f');
+  // 城門：下層走廊最右端的東牆城門（左右兩座塔樓、金色「城門」匾額、旗幟、綠色傳送門、敞開的大門）
+  // 格子：第 0 欄是走廊最後一格，第 1 欄是東牆（門洞），第 2、3 欄是門外；第 0 列是上方牆、第 1～3 列是走廊、第 4 列是下方牆
+  eastGate: { w: 4, h: 5, wall: true, draw(c, x, y, t) {
+    const g = 0.5 + 0.5 * Math.sin(t * 2.5);
+    // 門外石板路
+    R(c, x + 32, y + 16, 32, 48, '#a29a8a');
+    for (let k = 0; k < 6; k++) { R(c, x + 32, y + 16 + k * 8, 32, 1, '#8a8274'); R(c, x + 36 + ((k % 2) * 8), y + 16 + k * 8, 1, 8, '#8a8274'); R(c, x + 52 + ((k % 2) * 6), y + 16 + k * 8, 1, 8, '#8a8274'); }
+    // 門洞＋傳送門
+    R(c, x + 16, y + 14, 20, 52, '#2a2633');
+    const gr = c.createLinearGradient(x + 18, 0, x + 34, 0);
+    gr.addColorStop(0, `rgba(60,230,160,${0.55 + 0.35 * g})`); gr.addColorStop(1, `rgba(160,255,220,${0.35 + 0.3 * g})`);
+    c.fillStyle = gr; c.fillRect(x + 19, y + 17, 14, 46);
+    for (let k = 0; k < 8; k++) { const p = (t * 0.6 + k / 8) % 1; R(c, x + 20 + (k * 5) % 12, y + 62 - p * 44, 2, 2, `rgba(255,255,255,${1 - p})`); }
+    R(c, x + 25, y + 17, 2, 46, `rgba(255,255,255,${0.25 + 0.25 * g})`);
+    // 門框（石柱）
+    R(c, x + 14, y + 14, 4, 52, '#b8bcc6'); R(c, x + 14, y + 14, 1, 52, '#dfe3ea'); R(c, x + 34, y + 14, 4, 52, '#6f7482');
+    // 向外敞開的兩扇木門
+    [[y + 16], [y + 56]].forEach(([dy]) => {
+      R(c, x + 38, dy, 16, 8, '#7a4a26'); R(c, x + 38, dy, 16, 1, '#a0693a'); R(c, x + 38, dy + 7, 16, 1, '#4e2e15');
+      for (let i = 0; i < 4; i++) R(c, x + 40 + i * 4, dy + 3, 1, 1, '#f1c40f');
+    });
+    // 塔樓
+    const tower = (ty, front) => {
+      R(c, x + 12, ty, 48, front, '#8b909c');
+      for (let k = 0; k < front; k += 5) { R(c, x + 12, ty + k, 48, 1, '#6d727e'); for (let i = 0; i < 48; i += 10) R(c, x + 12 + i + ((k / 5) % 2) * 5, ty + k, 1, 5, '#6d727e'); }
+      R(c, x + 12, ty, 48, 2, '#b3b8c4');
+      for (let i = 0; i < 6; i++) { R(c, x + 12 + i * 8, ty - 6, 6, 6, '#9aa0ad'); R(c, x + 12 + i * 8, ty - 6, 6, 1, '#c9ced8'); R(c, x + 17 + i * 8, ty - 6, 1, 6, '#6d727e'); }
+      R(c, x + 12, ty + front - 2, 48, 2, '#4a4e58');
+    };
+    tower(y + 66, 14);
+    tower(y - 2, 18);
+    // 金色「城門」匾額
+    R(c, x + 18, y + 1, 36, 13, '#c9a227'); R(c, x + 19, y + 2, 34, 11, '#8e1b1b');
+    c.fillStyle = '#ffd94a'; c.font = 'bold 9px "Microsoft JhengHei","PingFang TC",sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText('城門', x + 36, y + 8); c.textAlign = 'start'; c.textBaseline = 'alphabetic';
+    // 旗幟（會飄）
+    [x + 13, x + 57].forEach((fx, i) => {
+      R(c, fx, y - 22, 1, 16, '#5d4037');
+      for (let k = 0; k < 8; k++) { const wv = Math.round(Math.sin(t * 6 + k * 0.7 + i) * 1); R(c, fx + 1 + k, y - 22 + wv, 1, 6 - Math.floor(k / 3), k % 3 ? '#e74c3c' : '#c0392b'); }
+      R(c, fx + 2, y - 20, 2, 2, '#f1c40f');
+    });
+    // 走廊這一側：紅色垂幕與火把
+    R(c, x + 3, y + 1, 9, 18, '#b0262b'); R(c, x + 3, y + 1, 9, 2, '#c9a227'); R(c, x + 5, y + 7, 5, 5, '#f1c40f'); R(c, x + 6, y + 8, 3, 3, '#b0262b');
+    R(c, x + 4, y + 19, 2, 2, '#b0262b'); R(c, x + 9, y + 19, 2, 2, '#b0262b');
+    const fl = Math.sin(t * 11) > 0 ? 1 : 0;
+    [[x + 6, y + 62]].forEach(([tx, ty]) => { R(c, tx, ty, 3, 6, '#5d4037'); R(c, tx - 1, ty - 4 - fl, 5, 4, '#ff9f1a'); R(c, tx, ty - 3 - fl, 3, 2, '#fff200'); });
+  } },
+  // 走廊地上往城門的綠色箭頭（會依序閃爍）
+  gateArrow: { w: 1, h: 1, ground: true, draw(c, x, y, t, o) {
+    const a = 0.25 + 0.75 * Math.max(0, Math.sin(t * 4 - (o.k || 0) * 0.9));
+    c.fillStyle = `rgba(90,255,170,${a})`;
+    for (let i = 0; i < 4; i++) { c.fillRect(x + 4 + i, y + 4 + i, 2, 1); c.fillRect(x + 4 + i, y + 11 - i, 2, 1); }
+    for (let i = 0; i < 4; i++) { c.fillRect(x + 9 + i, y + 4 + i, 2, 1); c.fillRect(x + 9 + i, y + 11 - i, 2, 1); }
   } },
   window: { w: 2, h: 1, wall: true, draw(c, x, y, t, o) {
     const [a, b] = skyColors();
@@ -134,7 +177,7 @@ Object.assign(PROPS, {
 const LIGHTS = {
   lamp: [8, 2, 40, '255,220,140'], lantern: [8, 7, 36, '255,120,60'], torch: [8, 1, 40, '255,150,50'],
   lampPost: [8, 4, 56, '255,230,150'], stoneLantern: [8, 12, 30, '255,200,110'],
-  uploadStation: [16, 16, 34, '120,255,245'], roundTable: [24, 12, 50, '255,220,120'], gate: [24, 16, 60, '80,255,180'],
+  uploadStation: [16, 16, 34, '120,255,245'], roundTable: [24, 12, 50, '255,220,120'], gate: [24, 16, 60, '80,255,180'], eastGate: [26, 40, 40, '80,255,180'],
   tesla: [8, 7, 30, '170,150,255'], aquarium: [16, 4, 30, '120,200,255'], altar: [24, 10, 48, '180,130,255'],
   readingDesk: [24, 8, 38, '255,230,160'], vending: [8, 10, 26, '255,255,255'], fountain: [16, 14, 30, '160,220,255'],
   countdown: [64, 6, 80, '255,60,90'], trophy: [8, 10, 28, '255,220,80'], planets: [16, 12, 30, '255,210,120'],

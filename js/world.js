@@ -1,6 +1,7 @@
 // ===== 城內地圖：房間配置、地板牆面材質、光影、角色走動、互動 =====
 const World = (() => {
   const BX = 6, BY = 6, W = 77, H = 56;
+  const GATE_X = BX + 64, GATE_Y = BY + 29;   // 城門：下層走廊最右端（東牆）
   const G_GRASS = 0, G_WALL = 1, G_FLOOR = 2, G_CORR = 3, G_PAVE = 4, G_PATH = 5;
   const grid = new Uint8Array(W * H);
   const roomOf = new Array(W * H).fill(null);
@@ -38,13 +39,13 @@ const World = (() => {
   // 地板材質與壁紙
   const FLOOR = {
     chinese: 'wood', english: 'carpet', math: 'tile', civics: 'parquet', geography: 'wood', history: 'marble',
-    physics: 'lab', earth: 'metal', biology: 'moss', lobby: 'marble', train: 'tatami', exam: 'darkwood', gate: 'stone',
+    physics: 'lab', earth: 'metal', biology: 'moss', lobby: 'marble', train: 'tatami', exam: 'darkwood', lounge: 'wood',
   };
   const WALLPAPER = {
     chinese: ['#e9d8b4', '#a0522d', 'lattice'], english: ['#d6e4f0', '#2e5f8a', 'stripe'], math: ['#dcefe5', '#2f7d62', 'grid'],
     civics: ['#e6dcef', '#6c3483', 'stripe'], geography: ['#e3efd6', '#4e7d32', 'dots'], history: ['#efe3cf', '#8b5a2b', 'panel'],
     physics: ['#eef0f2', '#d35400', 'grid'], earth: ['#2b3350', '#8fa3d9', 'stars'], biology: ['#dff2d8', '#2e8b57', 'leaf'],
-    lobby: ['#f3e3c3', '#9c6b3f', 'panel'], train: ['#ead7b0', '#6e4524', 'lattice'], exam: ['#d9c4a3', '#5d4037', 'panel'], gate: ['#bdbdbd', '#616161', 'brick'],
+    lobby: ['#f3e3c3', '#9c6b3f', 'panel'], train: ['#ead7b0', '#6e4524', 'lattice'], exam: ['#d9c4a3', '#5d4037', 'panel'], lounge: ['#f1e0cc', '#a1665e', 'stripe'],
   };
 
   function addRoom(r) { rooms.push(r); return r; }
@@ -60,7 +61,7 @@ const World = (() => {
     addRoom({ id: 'exam', kind: 'exam', name: '會考試題書房', x: BX + 48, y: BY + 14, w: 17, h: 15, doors: ['t', 'b'] });
     ['history', 'physics', 'earth', 'biology'].forEach((id, i) =>
       addRoom({ id, kind: 'subject', sub: SUBJ[id], x: BX + i * 13, y: BY + 32, w: 13, h: 11, doors: ['t'] }));
-    addRoom({ id: 'gate', kind: 'gate', name: '城門', x: BX + 52, y: BY + 32, w: 13, h: 11, doors: ['t'] });
+    addRoom({ id: 'lounge', kind: 'lounge', name: '休息室', x: BX + 52, y: BY + 32, w: 13, h: 11, doors: ['t'] });
 
     rooms.forEach(r => {
       r.ix = r.x + 1; r.iy = r.y + 1; r.iw = r.w - 2; r.ih = r.h - 2;
@@ -75,10 +76,12 @@ const World = (() => {
         for (let x = cx - half; x <= cx + half; x++) grid[idx(x, y)] = G_CORR;
       });
     });
-    // 戶外：建築外一圈人行道、城門往南的小路
+    // 城門：下層走廊最右端打通東牆
+    for (let y = GATE_Y; y < GATE_Y + 3; y++) grid[idx(GATE_X, y)] = G_CORR;
+    // 戶外：建築外一圈人行道、城門往東再往南接大路的小路
     for (let y = BY - 1; y <= BY + 43; y++) for (let x = BX - 1; x <= BX + 65; x++) if (inb(x, y) && grid[idx(x, y)] === G_GRASS) grid[idx(x, y)] = G_PAVE;
-    const gx = BX + 58;
-    for (let y = BY + 44; y < H; y++) for (let x = gx - 1; x <= gx + 1; x++) grid[idx(x, y)] = G_PATH;
+    for (let y = GATE_Y; y < GATE_Y + 3; y++) for (let x = GATE_X + 1; x <= BX + 69; x++) grid[idx(x, y)] = G_PATH;
+    for (let y = GATE_Y; y <= BY + 48; y++) for (let x = BX + 67; x <= BX + 69; x++) grid[idx(x, y)] = G_PATH;
     for (let x = 0; x < W; x++) for (let y = BY + 47; y <= BY + 48; y++) if (grid[idx(x, y)] === G_GRASS) grid[idx(x, y)] = G_PATH;
     layoutProps();
   }
@@ -100,7 +103,9 @@ const World = (() => {
       if (r.kind === 'subject') {
         const s = r.sub, lv = roomLevel(s), top = r.doors[0] === 'b';
         r.level = lv;
-        if (lv >= 6) P(r, 'rug', 3, 3, { color: s.color });
+        P(r, 'rug', 3, 3, { color: s.color });                    // 書桌下的地毯
+        P(r, 'bookshelf', 0, 3); P(r, 'lamp', 10, 5);              // 每間都有的基本家具
+        if (lv >= 6) P(r, 'wallShelf', top ? 7 : 8, -1);
         P(r, 'board', 0, -1, { color: s.color, action: 'progress:' + s.id, label: '學習進度' });
         P(r, 'uploadStation', 8, 0, { color: s.color, action: 'upload:' + s.id, label: '⬆ 上傳考卷', bright: true, below: true });
         P(r, 'desk', 4, 4); P(r, 'chairUp', 5, 5);
@@ -122,7 +127,7 @@ const World = (() => {
         P(r, 'sofa', 24, 4, { color: '#4a6fa5' }); P(r, 'sofa', 24, 8, { color: '#4a6fa5' }); P(r, 'sideTable', 23, 6);
         [[0, 0], [28, 0], [0, 12], [28, 12], [10, 0], [18, 0], [11, 12], [17, 12]].forEach(([x, y]) => P(r, 'plant', x, y));
         P(r, 'fountain', 8, 5); P(r, 'vending', 28, 5); P(r, 'reception', 22, 11);
-        P(r, 'lamp', 5, 11); P(r, 'bigPlant', 9, 9); P(r, 'lamp', 1, 6); P(r, 'lamp', 27, 10);
+        P(r, 'bigPlant', 19, 5); P(r, 'lamp', 1, 6); P(r, 'lamp', 1, 10); P(r, 'lamp', 27, 10);
       } else if (r.kind === 'train') {
         P(r, 'mat', 4, 4);
         P(r, 'altar', 6, 5, { action: 'train', label: '修練卷軸：錯題重練', bright: true });
@@ -138,13 +143,14 @@ const World = (() => {
         P(r, 'cabinet', 0, 6); P(r, 'cabinet', 14, 6);
         P(r, 'globe', 0, 10); P(r, 'lamp', 14, 10); P(r, 'plant', 0, 12); P(r, 'plant', 14, 12);
         P(r, 'chairUp', 7, 7); P(r, 'sideTable', 4, 6); P(r, 'boxes', 13, 12);
-        P(r, 'rug', 5, 9, { color: '#1f4e79' });
-      } else if (r.kind === 'gate') {
-        P(r, 'gate', 4, 7, { action: 'gate', label: '前往城外（需要出城令）', bright: true });
-        P(r, 'torch', 3, 7); P(r, 'torch', 7, 7);
-        P(r, 'ticketBooth', 0, 2, { action: 'gate' });
-        P(r, 'signpost', 10, 3); P(r, 'plant', 0, 0); P(r, 'plant', 10, 0); P(r, 'bush', 0, 8); P(r, 'bush', 10, 8);
-        P(r, 'stoneLantern', 1, 5); P(r, 'stoneLantern', 9, 5); P(r, 'noticeBoard', 7, -1); P(r, 'boxes', 0, 4);
+        P(r, 'rug', 5, 5, { color: '#1f4e79' });
+      } else if (r.kind === 'lounge') {
+        // 休息室：沙發、茶几、書櫃、留聲機、魚缸
+        P(r, 'rug', 3, 3, { color: '#b5651d' });
+        P(r, 'bookshelf', 0, 0); P(r, 'bookshelf', 9, 0);
+        P(r, 'sofa', 3, 6, { color: '#8e5b3c' }); P(r, 'sideTable', 5, 4); P(r, 'sideTable', 2, 4);
+        P(r, 'phonograph', 8, 4); P(r, 'aquarium', 7, 8); P(r, 'lamp', 0, 8); P(r, 'plant', 10, 8); P(r, 'bigPlant', 0, 5); P(r, 'flowers', 10, 4);
+        P(r, 'painting', 1, -1, { color: '#f7d9a8' }); P(r, 'wallShelf', 8, -1); P(r, 'clock', 3, -1);
       }
     });
     // 走廊：地毯、長椅、海報
@@ -159,13 +165,15 @@ const World = (() => {
     [[BX + 3, '#c0392b'], [BX + 12, '#2e86de'], [BX + 50, '#16a085'], [BX + 59, '#8e44ad']].forEach(([x, col]) => A('poster', x, BY + 28, { color: col }));
     A('noticeBoard', BX + 21, BY + 28); A('painting', BX + 40, BY + 28, { color: '#ffd7a8' });
     A('bench', BX + 21, BY + 31); A('bench', BX + 41, BY + 31);
-    A('plant', BX + 1, BY + 29); A('plant', BX + 63, BY + 29); A('plant', BX + 1, BY + 11); A('plant', BX + 63, BY + 11);
+    A('plant', BX + 1, BY + 29); A('plant', BX + 1, BY + 11); A('plant', BX + 63, BY + 11);
     // 戶外
     for (let x = BX + 2; x < BX + 64; x += 8) { A('lampPost', x, BY - 4); A('lampPost', x + 4, BY + 44); }
-    for (let y = BY + 4; y < BY + 42; y += 9) { A('lampPost', BX - 3, y); A('lampPost', BX + 66, y); }
+    for (let y = BY + 4; y < BY + 42; y += 9) { A('lampPost', BX - 3, y); if (Math.abs(y - GATE_Y) > 4) A('lampPost', BX + 66, y); }
     for (let x = BX + 4; x < BX + 62; x += 8) A('flowerBed', x, BY - 2);
-    A('outerGate', BX + 57, BY + 42);
-    A('signboard', BX + 54, BY + 45, { label: '🏯 會考學習城', sign: true });
+    // 城門（走廊最右端）＋地上的指引箭頭＋門外招牌
+    A('eastGate', GATE_X - 1, GATE_Y - 1, { action: 'gate', label: '🏯 城門：前往城外（需要出城令）', bright: true });
+    for (let x = GATE_X - 8; x <= GATE_X - 2; x++) A('gateArrow', x, GATE_Y + 1, { k: x - (GATE_X - 8) });
+    A('signboard', BX + 66, BY + 24, { label: '🏯 會考學習城', sign: true });
     A('pond', 1, H - 8);
     A('bench', BX + 30, BY + 45); A('bench', BX + 20, BY + 45);
     // 樹木、灌木、石頭（避開已經擺東西的位置）
@@ -186,6 +194,7 @@ const World = (() => {
       if (p.flat || p.wall || p.outdoor || p.ground) return;
       for (let y = p.ty; y < p.ty + p.h; y++) for (let x = p.tx; x < p.tx + p.w; x++) if (inb(x, y)) solid[idx(x, y)] = 1;
     });
+    for (let y = GATE_Y; y < GATE_Y + 3; y++) solid[idx(GATE_X, y)] = 1;   // 城門的傳送門本身不能走進去
     renderStatic();
   }
 
@@ -591,6 +600,9 @@ const World = (() => {
       if (r.kind === 'subject') { text = `${r.sub.room}  Lv.${r.level}`; bg = r.sub.color; }
       chip(text, sx, sy, bg, '#fff', 13);
     });
+    // 城門：醒目的紅色標籤
+    const eg = props.find(p => p.type === 'eastGate');
+    if (eg) { const [sx, sy] = toScreen(eg.px + 36, eg.py - 26); chip('🏯 城門 → 城外', sx, sy, '#c0392b', '#fff', 15); }
     const cd = props.find(p => p.type === 'countdown');
     if (cd) {
       const [sx, sy] = toScreen(cd.px + cd.w * T / 2, cd.py + 7);
@@ -689,6 +701,7 @@ const World = (() => {
   function zoom(d) { scale = Math.max(1, Math.min(5, scale + d)); }
 
   function roomCenter(id) {
+    if (id === 'gate') return [(GATE_X - 3) * T + 8, (GATE_Y + 1) * T + 12];
     const r = rooms.find(r => r.id === id);
     const cx = r.x + Math.floor(r.w / 2);
     const cy = r.doors[0] === 'b' ? r.y + r.h - 2 : r.y + 1;

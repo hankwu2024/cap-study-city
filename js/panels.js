@@ -580,7 +580,7 @@ const Panels = (() => {
 
   // ================= 快速移動 =================
   function travel() {
-    const places = [['lobby', '🏛️ 大廳（圓桌）'], ...SUBJECTS.map(s => [s.id, `${s.room}（Lv.${roomLevel(s)}）`]), ['train', '⚔️ 修練室'], ['exam', '📜 會考試題書房'], ['gate', '🏯 城門（城外）']];
+    const places = [['lobby', '🏛️ 大廳（圓桌）'], ...SUBJECTS.map(s => [s.id, `${s.room}（Lv.${roomLevel(s)}）`]), ['train', '⚔️ 修練室'], ['exam', '📜 會考試題書房'], ['lounge', '☕ 休息室'], ['gate', '🏯 城門（城外）']];
     const body = show('📍 快速前往', `<div class="pick-grid">${places.map(([id, n]) => `<button class="pick" data-go="${id}" style="--c:${SUBJ[id] ? SUBJ[id].color : '#555'}"><b>${n}</b></button>`).join('')}</div>`, '#555');
     $$('[data-go]', body).forEach(b => b.onclick = () => { close(); World.teleport(b.dataset.go); });
   }
