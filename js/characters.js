@@ -137,24 +137,19 @@ const _charSheet = id => _img(id, CHAR_SHEETS[id].src);
 const _charLayer = id => CHAR_SHEETS[id].layer ? _img(id + ':layer', CHAR_SHEETS[id].layer) : null;
 Object.keys(CHAR_SHEETS).forEach(id => { _charSheet(id); _charLayer(id); });
 
-// 夜刃的赤龍：一列一列畫成波浪，整條龍上下浮動，每隔幾秒昂首一次
+// 夜刃的赤龍：整條龍一起動，只做整數像素位移（不旋轉、不縮放，龍的形狀保持清楚）
+// 上下浮動、左右游移，每隔幾秒昂首（往上竄＋發亮）
 function _drawDragon(c, S, L, w, h, top, t) {
-  const s = S.scale;
   const roar = Math.max(0, Math.sin(t * 1.6)) ** 6;             // 0~1，昂首的瞬間
-  const lift = Math.sin(t * 2.2) * 1.6 - roar * 2.5;
-  const grow = 1 + roar * 0.08;
-  c.save();
-  c.translate(0, top + h * 0.75); c.scale(grow, grow); c.translate(0, -(top + h * 0.75));
-  for (let r = 0; r < S.h; r++) {
-    // 越靠近龍尾（下方）擺動越大，像在游動
-    const amp = 0.6 + (r / S.h) * 1.6 + roar;
-    const dx = Math.sin(t * 4.2 - r * 0.32) * amp;
-    c.drawImage(L, 0, r, S.w, 1, -w / 2 + dx, top + lift + r * s, w, s + 0.05);
-  }
-  // 發光的那一層（閃爍）
-  c.globalCompositeOperation = 'lighter';
-  c.globalAlpha = 0.15 + 0.15 * Math.sin(t * 7) + roar * 0.35;
-  c.drawImage(L, -w / 2, top + lift, w, h);
+  const dy = Math.round(Math.sin(t * 2.4) * 2 - roar * 4);
+  const dx = Math.round(Math.sin(t * 1.3) * 2);
+  // 龍畫得比本體大 1.2 倍（以腳底為基準往上長），在城裡也看得清楚
+  const k = 1.2, W2 = w * k, H2 = h * k, bot = top + h;
+  w = W2; h = H2; top = bot - H2 + h * 0.06;
+  c.drawImage(L, Math.round(-w / 2) + dx, Math.round(top) + dy, w, h);
+  c.save(); c.globalCompositeOperation = 'lighter';               // 發光閃爍
+  c.globalAlpha = 0.1 + 0.08 * Math.sin(t * 6) + roar * 0.45;
+  c.drawImage(L, Math.round(-w / 2) + dx, Math.round(top) + dy, w, h);
   c.restore();
   // 龍身散出的火星
   for (let i = 0; i < 7; i++) {
