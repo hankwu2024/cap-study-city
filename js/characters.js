@@ -168,9 +168,9 @@ function _drawFoxFires(c, S, L, w, top, t) {
   const s = S.scale;
   S.boxes.forEach(([bx, by, bw, bh], i) => {
     const ph = i * 1.9;
-    const dx = Math.cos(t * 1.8 + ph) * 2.2;
-    const dy = Math.sin(t * 2.6 + ph) * 2.8;
-    const st = 1 + 0.18 * Math.sin(t * 11 + ph);             // 火焰伸縮
+    const dx = Math.cos(t * 1.8 + ph) * 3.5;
+    const dy = Math.sin(t * 2.6 + ph) * 4;
+    const st = 1 + 0.28 * Math.sin(t * 11 + ph);             // 火焰伸縮
     const x = -w / 2 + bx * s + dx, yb = top + (by + bh) * s + dy;
     const dw = bw * s, dh = bh * s * st;
     c.save(); c.globalCompositeOperation = 'lighter';
