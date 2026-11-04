@@ -570,8 +570,8 @@ const Panels = (() => {
       cvs.forEach(cv => {
         const c = cv.getContext('2d'); c.imageSmoothingEnabled = false;
         c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, cv.width, cv.height);
-        const k = cv.width / 24; c.setTransform(k, 0, 0, k, 0, 0);
-        drawChar(c, CHAR[cv.dataset.char], 12, 26, 0, t, true);
+        const k = cv.width / 40; c.setTransform(k, 0, 0, k, 0, 0);
+        drawChar(c, CHAR[cv.dataset.char], 20, 44, 0, t, true);
       });
       requestAnimationFrame(frame);
     }

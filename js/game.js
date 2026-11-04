@@ -78,7 +78,7 @@ const Game = (() => {
     return {
       ch, x: 0, y: 0, r: 5, dir: 0, hp: ch.hp, maxHp: ch.hp, shield: ch.shield, maxShield: ch.shield,
       energy: ch.energy, maxEnergy: ch.energy, weapons: ch.weapons.slice(), cur: 0, fireCd: 0, skillCd: 0,
-      inv: 0, regen: 0, regenTick: 0, aim: 0, moving: false, dash: 0, dashDir: 0, speedUp: 0, swing: 0,
+      inv: 0, regen: 0, regenTick: 0, aim: 0, moving: false, dash: 0, dashDir: 0, speedUp: 0, swing: 0, guard: 0, rapid: 0, orbT: 0, orbHit: new Map(),
     };
   }
 
@@ -213,32 +213,42 @@ const Game = (() => {
     const ch = player.ch;
     player.skillCd = ch.skill.cd;
     addText(player.x, player.y - 28, ch.skill.name + '！', '#7efff5');
-    if (ch.skill.type === 'dash') {
-      player.dash = 0.22; player.dashDir = player.aim; player.inv = Math.max(player.inv, 0.35); player.dashHit = new Set();
-    } else if (ch.skill.type === 'meteor') {
-      const targets = enemies.filter(e => e.spawnT <= 0).sort((a, b) => dist(a, player) - dist(b, player)).slice(0, 6);
-      for (let i = 0; i < 6; i++) {
-        const tg = targets[i % Math.max(1, targets.length)];
-        const x = tg ? tg.x + (Math.random() - 0.5) * 10 : player.x + Math.cos(i) * 50;
-        const y = tg ? tg.y + (Math.random() - 0.5) * 10 : player.y + Math.sin(i) * 50;
-        meteors.push({ x, y, t: 0.5 + i * 0.12, r: 26, dmg: 7 });
-      }
-    } else if (ch.skill.type === 'turret') {
-      turrets.push({ x: player.x, y: player.y - 2, life: 8, cd: 0 });
-    } else {
-      player.hp = Math.min(player.maxHp, player.hp + 2); player.shield = player.maxShield; player.speedUp = 4;
-      burst(player.x, player.y - 8, '#ff9ff3', 16);
+    const ty = ch.skill.type;
+    if (ty === 'guard') {
+      // 赤翎：鐵壁反擊
+      player.guard = 3.5; shake = 3; burst(player.x, player.y - 10, '#dfe6e9', 18);
+    } else if (ty === 'overdrive') {
+      // 銀隼：火力全開
+      player.rapid = 5; player.speedUp = 5; burst(player.x, player.y - 8, '#ff9f43', 16);
+    } else if (ty === 'foxfire') {
+      // 緋狐：狐火環繞
+      player.orbT = 7; player.orbHit = new Map(); burst(player.x, player.y - 8, '#ffb142', 20);
+    } else if (ty === 'dragon') {
+      // 夜刃：赤龍咆哮——先震退周圍，再放出貫穿的赤龍
+      shake = 8;
+      for (let i = 0; i < 36; i++) { const q = i / 36 * Math.PI * 2; parts.push({ x: player.x, y: player.y - 8, vx: Math.cos(q) * 160, vy: Math.sin(q) * 160, life: 0.3, col: i % 2 ? '#ff2d55' : '#ff8fa3', s: 2 }); }
+      enemies.forEach(e => { if (e.spawnT <= 0 && dist(e, player) < 48) hurt(e, 4, (e.x - player.x) * 6, (e.y - player.y) * 6); });
+      bullets.forEach(b => { if (!b.friendly && Math.hypot(b.x - player.x, b.y - player.y) < 48) b.life = 0; });
+      const a = player.aim;
+      bullets.push({ x: player.x + Math.cos(a) * 8, y: player.y - 8 + Math.sin(a) * 8, vx: Math.cos(a) * 230, vy: Math.sin(a) * 230,
+        r: 11, dmg: 14, life: 1.3, friendly: true, color: '#ff2d55', pierce: true, ghost: true, dragon: true, hit: new Set() });
     }
   }
 
+  function orbPos() {
+    const n = 5, out = [];
+    for (let i = 0; i < n; i++) { const q = t * 4 + i / n * Math.PI * 2; out.push({ x: player.x + Math.cos(q) * 22, y: player.y - 8 + Math.sin(q) * 16 }); }
+    return out;
+  }
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
   function fire() {
     const w = weapon();
     if (player.fireCd > 0) return;
-    if (player.energy < w.cost) { addText(player.x, player.y - 24, '能量不足', '#74b9ff'); player.fireCd = 0.4; return; }
-    player.energy -= w.cost;
-    player.fireCd = w.rate;
+    if (player.energy < w.cost && player.rapid <= 0) { addText(player.x, player.y - 24, '能量不足', '#74b9ff'); player.fireCd = 0.4; return; }
+    const od = player.rapid > 0;
+    if (!od) player.energy -= w.cost;
+    player.fireCd = w.rate * (od ? 0.35 : 1);
     const a = player.aim;
     if (w.melee) {
       player.swing = 0.15;
@@ -288,7 +298,7 @@ const Game = (() => {
   }
 
   function damagePlayer(n) {
-    if (player.inv > 0 || ended) return;
+    if (player.inv > 0 || player.guard > 0 || ended) return;
     shake = 4; player.regen = 3; player.inv = 0.7;
     while (n-- > 0) { if (player.shield > 0) player.shield--; else player.hp--; }
     burst(player.x, player.y - 8, '#ff7675', 8);
@@ -330,6 +340,18 @@ const Game = (() => {
     if (!player.moving) { const a = player.aim; player.dir = Math.abs(Math.cos(a)) > Math.abs(Math.sin(a)) ? (Math.cos(a) < 0 ? 2 : 3) : (Math.sin(a) < 0 ? 1 : 0); }
     // 計時
     player.fireCd -= dt; player.skillCd = Math.max(0, player.skillCd - dt); player.inv -= dt; player.speedUp -= dt; player.swing -= dt; player.flash = (player.flash || 0) - dt;
+    player.guard -= dt; player.rapid -= dt; player.orbT -= dt;
+    if (player.rapid > 0 && Math.random() < 0.4) parts.push({ x: player.x + (Math.random() - 0.5) * 12, y: player.y - Math.random() * 16, vx: 0, vy: -30, life: 0.3, col: Math.random() < 0.5 ? '#ff9f43' : '#ff4757', s: 1 });
+    if (player.orbT > 0) {
+      // 狐火：繞圈、燒傷敵人、擋子彈
+      orbPos().forEach(o => {
+        enemies.forEach(e => { if (e.spawnT > 0 || e.dead) return; const last = player.orbHit.get(e) || -9;
+          if (Math.hypot(e.x - o.x, e.y - 4 - o.y) < e.r + 5 && t - last > 0.45) { player.orbHit.set(e, t); hurt(e, 3, e.x - player.x, e.y - player.y); } });
+        bullets.forEach(b => { if (!b.friendly && Math.hypot(b.x - o.x, b.y - o.y) < 6) { b.life = 0; burst(b.x, b.y, '#ffb142', 4); } });
+        if (Math.random() < 0.25) parts.push({ x: o.x, y: o.y, vx: 0, vy: -20, life: 0.3, col: Math.random() < 0.5 ? '#ffd32a' : '#ff6b35', s: 1 });
+      });
+      enemies = enemies.filter(e => !e.dead);
+    }
     player.regen -= dt;
     if (player.regen <= 0 && player.shield < player.maxShield) { player.regenTick -= dt; if (player.regenTick <= 0) { player.shield++; player.regenTick = 1; } }
     if (keys.KeyJ || mouse.down || touchBtn.fire || keys.Space) fire();
@@ -367,9 +389,10 @@ const Game = (() => {
       }
       b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
       if (b.wid === 'fire' && Math.random() < 0.7) parts.push({ x: b.x + (Math.random() - 0.5) * 3, y: b.y + (Math.random() - 0.5) * 3, vx: -b.vx * 0.15, vy: -b.vy * 0.15 - 15, life: 0.25, col: Math.random() < 0.5 ? '#ff9f43' : '#ffd32a', s: 1 });
+      if (b.dragon) for (let k = 0; k < 2; k++) parts.push({ x: b.x + (Math.random() - 0.5) * 14, y: b.y + (Math.random() - 0.5) * 14, vx: -b.vx * 0.2, vy: -b.vy * 0.2, life: 0.35, col: Math.random() < 0.5 ? '#ff2d55' : '#7a0f24', s: 2 });
       if (b.wid === 'staff' && Math.random() < 0.35) parts.push({ x: b.x, y: b.y, vx: 0, vy: 0, life: 0.3, col: '#e0b3ff', s: 1 });
       const tile = tileAt(b.x, b.y);
-      if (tile) {
+      if (tile && !b.ghost) {
         if (tile === 2 && b.friendly) {
           const k = Math.floor(b.y / TS) * map.w + Math.floor(b.x / TS);
           map.hp[k] = (map.hp[k] || 1) - 1;
@@ -387,7 +410,13 @@ const Game = (() => {
             if (!b.pierce) { b.life = 0; break; }
           }
         }
-      } else if (Math.hypot(player.x - b.x, player.y - 7 - b.y) < player.r + b.r) { b.life = 0; damagePlayer(1); }
+      } else if (Math.hypot(player.x - b.x, player.y - 7 - b.y) < player.r + b.r + (player.guard > 0 ? 8 : 0)) {
+        if (player.guard > 0) {
+          // 鐵壁反擊：子彈反彈變成我方子彈
+          b.friendly = true; b.vx *= -1.4; b.vy *= -1.4; b.dmg = 3; b.life = 1.2; b.color = '#e8434d'; b.hit = new Set();
+          burst(b.x, b.y, '#fff', 4);
+        } else { b.life = 0; damagePlayer(1); }
+      }
     });
     bullets = bullets.filter(b => b.life > 0);
     enemies = enemies.filter(e => !e.dead);
@@ -502,6 +531,41 @@ const Game = (() => {
     if (e.type !== 'boss' && e.hp < e.maxHp) { const bw = 14, by = y - lift - h - 3; R(c, x - bw / 2 - 1, by - 1, bw + 2, 4, '#1a1320'); R(c, x - bw / 2, by, bw, 2, '#4a2a2a'); R(c, x - bw / 2, by, Math.max(0, bw * e.hp / e.maxHp), 2, '#ff4757'); }
   }
 
+  // ---------- 技能特效 ----------
+  function drawSkillFx() {
+    if (player.guard > 0) {
+      const a = Math.min(1, player.guard * 2), p = 0.5 + 0.5 * Math.sin(t * 10);
+      c.save(); c.globalAlpha = 0.35 * a; c.fillStyle = '#c8d6e5';
+      c.beginPath(); c.ellipse(player.x, player.y - 10, 15, 16, 0, 0, 7); c.fill();
+      c.globalAlpha = (0.6 + 0.3 * p) * a; c.strokeStyle = '#e8434d'; c.lineWidth = 1.5; c.stroke();
+      c.strokeStyle = '#fff'; c.lineWidth = 1; c.beginPath(); c.arc(player.x, player.y - 10, 13, -2.4, -1.2); c.stroke();
+      c.restore();
+    }
+    if (player.orbT > 0) orbPos().forEach((o, i) => {
+      const f = Math.sin(t * 12 + i) > 0;
+      c.save(); c.globalCompositeOperation = 'lighter'; c.fillStyle = 'rgba(255,120,30,0.35)';
+      c.beginPath(); c.arc(o.x, o.y, 6, 0, 7); c.fill(); c.restore();
+      R(c, o.x - 2, o.y - 2, 5, 5, '#ff6b35'); R(c, o.x - 1, o.y - (f ? 4 : 3), 3, 3, '#ffb142'); R(c, o.x - 1, o.y - 1, 2, 2, '#fff3b0');
+    });
+    if (player.rapid > 0) {
+      c.save(); c.globalCompositeOperation = 'lighter'; c.globalAlpha = 0.25 + 0.15 * Math.sin(t * 16);
+      c.fillStyle = '#ff9f43'; c.beginPath(); c.ellipse(player.x, player.y - 1, 11, 4, 0, 0, 7); c.fill(); c.restore();
+    }
+  }
+  function drawDragonBolt(b) {
+    const a = Math.atan2(b.vy, b.vx);
+    c.save(); c.translate(b.x, b.y); c.rotate(a);
+    c.globalCompositeOperation = 'lighter'; c.fillStyle = 'rgba(255,45,85,0.3)';
+    c.beginPath(); c.ellipse(-6, 0, 22, 12, 0, 0, 7); c.fill();
+    c.globalCompositeOperation = 'source-over';
+    // 身體（波浪）
+    for (let i = 6; i >= 1; i--) { const yy = Math.sin(t * 18 - i) * 3; R(c, -i * 5 - 3, yy - 3, 6, 6, i % 2 ? '#a3122e' : '#e0203f'); R(c, -i * 5 - 2, yy - 5, 2, 2, '#ff8fa3'); }
+    // 頭
+    R(c, -4, -6, 12, 12, '#e0203f'); R(c, 6, -4, 6, 8, '#e0203f'); R(c, 8, 1, 5, 3, '#7a0f24');
+    R(c, -2, -9, 3, 4, '#ff8fa3'); R(c, 3, -10, 3, 5, '#ff8fa3');
+    R(c, 3, -3, 3, 2, '#fff'); R(c, -4, -6, 12, 1, '#ff5c7a');
+    c.restore();
+  }
   function handPos() { return { x: player.x + Math.cos(player.aim) * 3, y: player.y - 8 + Math.sin(player.aim) * 2 }; }
   function drawWeapon() {
     const w = weapon(), id = player.weapons[player.cur], h = handPos();
@@ -714,10 +778,12 @@ const Game = (() => {
       if (back) drawWeapon();
       drawChar(c, player.ch, player.x, player.y, player.dir, t, player.moving);
       if (!back) drawWeapon();
+      drawSkillFx();
     } });
     list.sort((a, b) => a.y - b.y).forEach(o => o.d());
     // 子彈
     bullets.forEach(b => {
+      if (b.dragon) { drawDragonBolt(b); return; }
       if (b.wid) { drawProjectile(c, b, t); return; }
       c.fillStyle = b.color; c.beginPath(); c.arc(b.x, b.y, b.r, 0, 7); c.fill();
       if (!b.friendly) { c.fillStyle = '#fff'; c.beginPath(); c.arc(b.x, b.y, 1, 0, 7); c.fill(); }
@@ -795,7 +861,7 @@ const Game = (() => {
 
   function loop(ts) {
     if (!running) return;
-    const dt = Math.min(0.033, (ts - last) / 1000 || 0); last = ts;
+    const dt = Math.max(0, Math.min(0.033, (ts - last) / 1000 || 0)); last = ts;
     if (!paused && !ended) { t += dt; update(dt); }
     render();
     requestAnimationFrame(loop);
