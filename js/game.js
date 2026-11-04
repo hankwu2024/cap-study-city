@@ -103,6 +103,7 @@ const Game = (() => {
     enemies = []; bullets = []; pickups = []; parts = []; texts = []; turrets = []; meteors = [];
     portal = null; chest = null;
     player.x = map.w * TS / 2; player.y = (map.h - 3) * TS;
+    unstick(player);
     banner = { text: stageName() + (isBoss ? '　⚠ 頭目房' : isTreasure ? '　🎁 寶箱房' : ''), life: 2.2 };
     if (isTreasure) {
       chest = { x: map.w * TS / 2, y: map.h * TS / 2 - 8, open: false };
@@ -149,6 +150,7 @@ const Game = (() => {
       if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
     });
     window.addEventListener('keyup', e => { keys[e.code] = false; });
+    window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouse.down = false; stick.active = false; stick.dx = stick.dy = 0; });
     const cvs = $('#game-canvas');
     cvs.addEventListener('mousemove', e => { const r = cvs.getBoundingClientRect(); mouse.x = (e.clientX - r.left - offX) / scale; mouse.y = (e.clientY - r.top - offY) / scale; mouse.used = t; });
     cvs.addEventListener('mousedown', e => { if (e.button === 0) mouse.down = true; if (e.button === 2) skill(); });
@@ -305,6 +307,15 @@ const Game = (() => {
     if (player.hp <= 0) { player.hp = 0; gameOver(true); }
   }
 
+  // 角色卡在牆或箱子裡時，移到最近的空地
+  function unstick(ent) {
+    if (!circleBlocked(ent.x, ent.y, ent.r)) return;
+    for (let rad = 4; rad <= 160; rad += 4) for (let k = 0; k < 16; k++) {
+      const a = k / 16 * Math.PI * 2, x = ent.x + Math.cos(a) * rad, y = ent.y + Math.sin(a) * rad;
+      if (!circleBlocked(x, y, ent.r)) { ent.x = x; ent.y = y; return; }
+    }
+  }
+
   // ---------- 更新 ----------
   function aimTarget() {
     let best = null, bd = 230;
@@ -313,6 +324,7 @@ const Game = (() => {
   }
 
   function update(dt) {
+    unstick(player);
     // 移動
     let vx = 0, vy = 0;
     if (keys.KeyA || keys.ArrowLeft) vx--; if (keys.KeyD || keys.ArrowRight) vx++;
@@ -862,9 +874,11 @@ const Game = (() => {
   function loop(ts) {
     if (!running) return;
     const dt = Math.max(0, Math.min(0.033, (ts - last) / 1000 || 0)); last = ts;
-    if (!paused && !ended) { t += dt; update(dt); }
-    render();
-    requestAnimationFrame(loop);
+    requestAnimationFrame(loop);   // 先排好下一格：就算這一格出錯，遊戲也不會整個卡住
+    try {
+      if (!paused && !ended) { t += dt; update(dt); }
+      render();
+    } catch (err) { console.error('遊戲畫面發生錯誤（已略過這一格）', err); }
   }
 
   function gameOver(died) {
